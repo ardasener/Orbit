@@ -9,115 +9,95 @@ import {
   type ReactNode,
 } from "react";
 import { ptyShellName } from "../modules/terminal/pty";
+import { appendTabsToPane, moveTabBetweenPanes, removeTabFromPane } from "./paneLayout";
+
+export type PaneIndex = 0 | 1 | 2;
 
 export interface TerminalTab {
   id: string;
   title: string;
-  /** Font size offset relative to the settings default (per-tab zoom). */
   fontZoom: number;
-  /** Worktree path this tab's sessions run in. */
   worktree: string;
-  /** Command run through the interactive shell (runnable tabs); null = plain shell. */
   command: string | null;
 }
 
-/** Session-scoped layout for one worktree: its tabs, splits, and focus. */
+export interface PaneState {
+  tabs: TerminalTab[];
+  activeTabId: string | null;
+}
+
 export interface WorktreeLayout {
-  tabs: TerminalTab[];
-  /** slot index → tab id (null = placeholder). slot0 always exists. */
-  slots: (string | null)[];
-  focusedSlot: number;
-  /** Right pane (slot1) open. */
+  panes: [PaneState, PaneState | null, PaneState | null];
+  focusedPane: PaneIndex;
   vertical: boolean;
-  /** Bottom pane (slot2) open. */
   bottom: boolean;
 }
 
-/**
- * Shape of the ACTIVE worktree's layout, kept for component compatibility
- * (the tab bar, split layout, and dimming read these fields).
- */
 export interface LayoutState {
-  tabs: TerminalTab[];
-  slots: (string | null)[];
-  focusedSlot: number;
+  panes: [PaneState | null, PaneState | null, PaneState | null];
+  focusedPane: PaneIndex;
   vertical: boolean;
   bottom: boolean;
 }
 
-/** In-flight pointer-based tab drag (WKWebView lacks working HTML5 DnD). */
 export interface TabDrag {
   tabId: string;
+  sourcePane: PaneIndex;
   x: number;
   y: number;
-  /** Pane slot currently under the pointer, or null. */
-  overSlot: number | null;
-}
-
-/** Extract the slot index from a slot element's class (`slot-0`/`slot-1`/`slot-2`). */
-export function slotFromClass(el: Element): number | null {
-  const m = el.className.match(/slot-([012])/);
-  return m ? Number(m[1]) : null;
+  targetPane: PaneIndex | null;
+  targetIndex: number | null;
 }
 
 interface TerminalLayoutContextValue {
-  /** The active worktree's layout (empty when nothing is active). */
   state: LayoutState;
-  /** Every tab across every worktree (hosts stay mounted). */
   allTabs: TerminalTab[];
-  /** worktree path → number of open terminals there (for the cleanup modal). */
   worktreeTabCounts: Record<string, number>;
-  /** Currently selected worktree path, or null. */
   activeWorktree: string | null;
-  /** Resolved default shell name (e.g. "zsh"), the idle tab title. */
   shellName: string;
   tabOf: (tabId: string) => TerminalTab | undefined;
-  /** Panel slot a tab occupies within its own worktree, or null if parked. */
-  slotOf: (tabId: string) => number | null;
-  /** Activate a worktree, creating a fresh one-tab layout on first visit. */
+  paneOf: (tabId: string) => PaneIndex | null;
   setActiveWorktree: (path: string) => void;
-  newTab: () => void;
-  /** Launch runnable commands: one tab per command, first in the focused slot,
-   * the rest parked, all in the active worktree. */
+  newTab: (pane?: PaneIndex) => void;
   launchRunnable: (commands: string[]) => void;
   closeTab: (tabId: string) => void;
-  /** Close every tab of a worktree (bulk cleanup); the worktree stays tracked. */
   closeWorktreeTabs: (path: string) => void;
   selectTab: (tabId: string) => void;
-  focusSlot: (slot: number) => void;
+  focusSlot: (slot: PaneIndex) => void;
   toggleVertical: () => void;
   toggleBottom: () => void;
-  /** Assign a dragged tab to a slot (parked → assign; shown elsewhere → swap). */
-  dropTabOnSlot: (tabId: string, slot: number) => void;
-  /** Swap the tabs of two slots (reserved for pane drag, not yet wired). */
-  swapSlots: (a: number, b: number) => void;
-  /** Adjust a tab's font size by a delta relative to the settings default. */
+  reorderTab: (tabId: string, pane: PaneIndex, index: number) => void;
+  moveTabToPane: (tabId: string, pane: PaneIndex, index: number) => void;
   zoomTab: (tabId: string, delta: number) => void;
-  /** Set a tab's title (auto-naming from the running process). */
   renameTab: (tabId: string, title: string) => void;
-  /** Active pointer drag (null when idle). */
   drag: TabDrag | null;
-  beginDrag: (tabId: string, x: number, y: number) => void;
+  beginDrag: (tabId: string, pane: PaneIndex, x: number, y: number) => void;
   moveDrag: (x: number, y: number) => void;
   endDrag: () => void;
 }
 
 const TerminalLayoutContext = createContext<TerminalLayoutContextValue | null>(null);
 
-/** Create a fresh tab id. Monotonic counter avoids collisions with old ids. */
 let idCounter = 0;
 function makeId(): string {
   idCounter += 1;
   return `tab-${idCounter}`;
 }
 
-/** Build a tab for a worktree; `command` is null for shell sessions. */
 function makeTab(worktree: string, title: string, command: string | null): TerminalTab {
   return { id: makeId(), title, fontZoom: 0, worktree, command };
 }
 
+function makePane(worktree: string, title: string): PaneState {
+  const tab = makeTab(worktree, title, null);
+  return { tabs: [tab], activeTabId: tab.id };
+}
+
+function clampIndex(index: number, length: number): number {
+  return Math.max(0, Math.min(index, length));
+}
+
 export function TerminalLayoutProvider({ children }: { children: ReactNode }) {
-  // Default tab title = the resolved shell name (e.g. "zsh", "bash").
   const [shellName, setShellName] = useState("sh");
   useEffect(() => {
     let cancelled = false;
@@ -125,56 +105,50 @@ export function TerminalLayoutProvider({ children }: { children: ReactNode }) {
       .then((name) => {
         if (!cancelled && name) setShellName(name);
       })
-      .catch(() => {
-        /* keep "sh" fallback */
-      });
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, []);
 
-  /** worktree path → its session layout. */
   const [layouts, setLayouts] = useState<Record<string, WorktreeLayout>>({});
   const [activeWorktree, setActiveWorktreeState] = useState<string | null>(null);
-
-  const activeLayout: WorktreeLayout | null =
-    activeWorktree != null ? (layouts[activeWorktree] ?? null) : null;
+  const activeLayout = activeWorktree == null ? null : layouts[activeWorktree] ?? null;
 
   const allTabs = useMemo(
-    () => Object.values(layouts).flatMap((l) => l.tabs),
+    () => Object.values(layouts).flatMap((layout) => layout.panes.flatMap((pane) => pane?.tabs ?? [])),
     [layouts],
   );
 
-  /** worktree path → number of open terminals (for the cleanup modal). */
   const worktreeTabCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const [path, layout] of Object.entries(layouts)) {
-      counts[path] = layout.tabs.length;
+      counts[path] = layout.panes.reduce((total, pane) => total + (pane?.tabs.length ?? 0), 0);
     }
     return counts;
   }, [layouts]);
 
   const tabOf = useCallback(
-    (tabId: string) => allTabs.find((t) => t.id === tabId),
+    (tabId: string) => allTabs.find((tab) => tab.id === tabId),
     [allTabs],
   );
 
-  const slotOf = useCallback(
-    (tabId: string) => {
+  const paneOf = useCallback(
+    (tabId: string): PaneIndex | null => {
       for (const layout of Object.values(layouts)) {
-        const i = layout.slots.indexOf(tabId);
-        if (i !== -1) return i;
+        for (let index = 0; index < layout.panes.length; index += 1) {
+          if (layout.panes[index]?.tabs.some((tab) => tab.id === tabId)) return index as PaneIndex;
+        }
       }
       return null;
     },
     [layouts],
   );
 
-  /** The layout that owns a tab (for cross-worktree mutations). */
   const layoutOfTab = useCallback(
     (tabId: string) => {
       for (const [path, layout] of Object.entries(layouts)) {
-        if (layout.tabs.some((t) => t.id === tabId)) return path;
+        if (layout.panes.some((pane) => pane?.tabs.some((tab) => tab.id === tabId))) return path;
       }
       return null;
     },
@@ -182,43 +156,34 @@ export function TerminalLayoutProvider({ children }: { children: ReactNode }) {
   );
 
   const updateLayout = useCallback(
-    (path: string, updater: (l: WorktreeLayout) => WorktreeLayout) => {
-      setLayouts((prev) => {
-        const layout = prev[path];
-        if (!layout) return prev;
+    (path: string, updater: (layout: WorktreeLayout) => WorktreeLayout) => {
+      setLayouts((previous) => {
+        const layout = previous[path];
+        if (!layout) return previous;
         const next = updater(layout);
-        // Bail when nothing changed so stable updates keep stable references
-        // (children keyed off `layouts`/`allTabs` must not churn).
-        return next === layout ? prev : { ...prev, [path]: next };
+        return next === layout ? previous : { ...previous, [path]: next };
       });
     },
     [],
   );
 
   const updateActiveLayout = useCallback(
-    (updater: (l: WorktreeLayout) => WorktreeLayout) => {
-      setLayouts((prev) => {
-        if (activeWorktree == null || !prev[activeWorktree]) return prev;
-        const layout = prev[activeWorktree];
-        const next = updater(layout);
-        return next === layout ? prev : { ...prev, [activeWorktree]: next };
-      });
+    (updater: (layout: WorktreeLayout) => WorktreeLayout) => {
+      if (activeWorktree == null) return;
+      updateLayout(activeWorktree, updater);
     },
-    [activeWorktree],
+    [activeWorktree, updateLayout],
   );
 
   const setActiveWorktree = useCallback(
     (path: string) => {
-      setLayouts((prev) => {
-        if (prev[path]) return prev;
-        // Fresh worktree: one tab in the default slot.
-        const tab = makeTab(path, shellName, null);
+      setLayouts((previous) => {
+        if (previous[path]) return previous;
         return {
-          ...prev,
+          ...previous,
           [path]: {
-            tabs: [tab],
-            slots: [tab.id, null, null],
-            focusedSlot: 0,
+            panes: [makePane(path, shellName), null, null],
+            focusedPane: 0,
             vertical: false,
             bottom: false,
           },
@@ -229,35 +194,36 @@ export function TerminalLayoutProvider({ children }: { children: ReactNode }) {
     [shellName],
   );
 
-  const newTab = useCallback(() => {
-    updateActiveLayout((layout) => {
-      const focused = Math.min(layout.focusedSlot, layout.slots.length - 1);
-      const tab = makeTab(activeWorktree!, shellName, null);
-      const slots = [...layout.slots];
-      slots[focused] = tab.id; // previous occupant parks
-      return { ...layout, tabs: [...layout.tabs, tab], slots, focusedSlot: focused };
-    });
-  }, [updateActiveLayout, shellName, activeWorktree]);
+  const newTab = useCallback(
+    (pane: PaneIndex = activeLayout?.focusedPane ?? 0) => {
+      updateActiveLayout((layout) => {
+        const current = layout.panes[pane];
+        if (!current || activeWorktree == null) return layout;
+        const tab = makeTab(activeWorktree, shellName, null);
+        const nextPane = { tabs: [...current.tabs, tab], activeTabId: tab.id };
+        const panes = [...layout.panes] as WorktreeLayout["panes"];
+        panes[pane] = nextPane;
+        return { ...layout, panes, focusedPane: pane };
+      });
+    },
+    [activeLayout?.focusedPane, activeWorktree, shellName, updateActiveLayout],
+  );
 
   const launchRunnable = useCallback(
     (commands: string[]) => {
       if (commands.length === 0 || activeWorktree == null) return;
       updateActiveLayout((layout) => {
-        const focused = Math.min(layout.focusedSlot, layout.slots.length - 1);
-        // Titles start as the shell name; the auto-title poller renames each
-        // tab to its foreground process (the command is the shell's child).
-        const tabs = commands.map((cmd) => makeTab(activeWorktree, shellName, cmd));
-        const slots = [...layout.slots];
-        slots[focused] = tabs[0].id; // previous occupant parks
-        return {
-          ...layout,
-          tabs: [...layout.tabs, ...tabs],
-          slots,
-          focusedSlot: focused,
-        };
+        const paneIndex = layout.focusedPane;
+        const current = layout.panes[paneIndex];
+        if (!current) return layout;
+        const tabs = commands.map((command) => makeTab(activeWorktree, shellName, command));
+        const nextPane = appendTabsToPane(current, tabs);
+        const panes = [...layout.panes] as WorktreeLayout["panes"];
+        panes[paneIndex] = nextPane;
+        return { ...layout, panes };
       });
     },
-    [updateActiveLayout, activeWorktree, shellName],
+    [activeWorktree, shellName, updateActiveLayout],
   );
 
   const closeTab = useCallback(
@@ -265,121 +231,102 @@ export function TerminalLayoutProvider({ children }: { children: ReactNode }) {
       const path = layoutOfTab(tabId);
       if (!path) return;
       updateLayout(path, (layout) => {
-        const slots = layout.slots.map((t) => (t === tabId ? null : t));
-        const wasFocused = layout.slots[layout.focusedSlot] === tabId;
-        return {
-          ...layout,
-          tabs: layout.tabs.filter((t) => t.id !== tabId),
-          slots,
-          focusedSlot: wasFocused ? 0 : layout.focusedSlot,
-        };
+        const panes = [...layout.panes] as WorktreeLayout["panes"];
+        for (let index = 0; index < panes.length; index += 1) {
+          const pane = panes[index];
+          if (!pane) continue;
+          const tabIndex = pane.tabs.findIndex((tab) => tab.id === tabId);
+          if (tabIndex === -1) continue;
+          panes[index] = removeTabFromPane(pane, tabId);
+          return { ...layout, panes };
+        }
+        return layout;
       });
     },
     [layoutOfTab, updateLayout],
   );
 
-  /** Close every tab of a worktree (bulk cleanup); the worktree stays tracked. */
-  const closeWorktreeTabs = useCallback(
-    (path: string) => {
-      setLayouts((prev) => {
-        if (!prev[path]) return prev;
-        const next = { ...prev };
-        delete next[path];
-        return next;
-      });
-    },
-    [],
-  );
+  const closeWorktreeTabs = useCallback((path: string) => {
+    setLayouts((previous) => {
+      if (!previous[path]) return previous;
+      const next = { ...previous };
+      delete next[path];
+      return next;
+    });
+  }, []);
 
   const selectTab = useCallback(
     (tabId: string) => {
       updateActiveLayout((layout) => {
-        const focused = Math.min(layout.focusedSlot, layout.slots.length - 1);
-        // If the tab is already shown somewhere, just focus that slot.
-        const shown = layout.slots.indexOf(tabId);
-        if (shown !== -1) {
-          return shown === focused ? layout : { ...layout, focusedSlot: shown };
+        for (let index = 0; index < layout.panes.length; index += 1) {
+          const pane = layout.panes[index];
+          if (!pane?.tabs.some((tab) => tab.id === tabId)) continue;
+          const paneIndex = index as PaneIndex;
+          if (pane.activeTabId === tabId && layout.focusedPane === paneIndex) return layout;
+          const panes = [...layout.panes] as WorktreeLayout["panes"];
+          panes[index] = { ...pane, activeTabId: tabId };
+          return { ...layout, panes, focusedPane: paneIndex };
         }
-        // Otherwise show it in the focused slot, parking the current occupant.
-        const slots = [...layout.slots];
-        slots[focused] = tabId;
-        return { ...layout, slots, focusedSlot: focused };
+        return layout;
       });
     },
     [updateActiveLayout],
   );
 
   const focusSlot = useCallback(
-    (slot: number) => {
-      updateActiveLayout((layout) =>
-        layout.focusedSlot === slot ? layout : { ...layout, focusedSlot: slot },
-      );
+    (slot: PaneIndex) => {
+      updateActiveLayout((layout) => {
+        const visible = slot === 0 || (slot === 1 ? layout.vertical : layout.bottom);
+        return visible && layout.panes[slot] && layout.focusedPane !== slot
+          ? { ...layout, focusedPane: slot }
+          : layout;
+      });
     },
     [updateActiveLayout],
   );
 
   const toggleSplit = useCallback(
-    (slot: number, key: "vertical" | "bottom") => {
+    (slot: 1 | 2, key: "vertical" | "bottom") => {
       updateActiveLayout((layout) => {
         const open = !layout[key];
-        const slots = [...layout.slots];
-        if (open) {
-          const parked = layout.tabs.find((t) => !slots.includes(t.id));
-          if (parked) {
-            slots[slot] = parked.id;
-            return { ...layout, [key]: open, slots };
-          }
-          const tab = makeTab(activeWorktree!, shellName, null);
-          slots[slot] = tab.id;
-          return { ...layout, [key]: open, slots, tabs: [...layout.tabs, tab] };
+        const panes = [...layout.panes] as WorktreeLayout["panes"];
+        if (open && panes[slot] == null && activeWorktree != null) {
+          panes[slot] = makePane(activeWorktree, shellName);
         }
-        slots[slot] = null;
-        return {
-          ...layout,
-          [key]: open,
-          slots,
-          focusedSlot: layout.focusedSlot === slot ? 0 : layout.focusedSlot,
-        };
+        return { ...layout, [key]: open, panes };
       });
     },
-    [updateActiveLayout, shellName, activeWorktree],
+    [activeWorktree, shellName, updateActiveLayout],
   );
 
   const toggleVertical = useCallback(() => toggleSplit(1, "vertical"), [toggleSplit]);
   const toggleBottom = useCallback(() => toggleSplit(2, "bottom"), [toggleSplit]);
 
-  const dropTabOnSlot = useCallback(
-    (tabId: string, slot: number) => {
-      updateActiveLayout((layout) => {
-        const slots = [...layout.slots];
-        const from = slots.indexOf(tabId);
-        if (from !== -1 && from !== slot) {
-          // Shown in another pane → swap the two panes' tabs.
-          slots[from] = slots[slot];
-          slots[slot] = tabId;
-        } else if (from === -1) {
-          // Parked → assign, parking the slot's current occupant.
-          slots[slot] = tabId;
-        } else {
-          return { ...layout, focusedSlot: slot };
-        }
-        return { ...layout, slots, focusedSlot: slot };
+  const updateTabOrder = useCallback(
+    (tabId: string, destinationPane: PaneIndex, destinationIndex: number) => {
+      const path = layoutOfTab(tabId);
+      if (!path) return;
+      updateLayout(path, (layout) => {
+        const panes = moveTabBetweenPanes(
+          layout.panes,
+          tabId,
+          destinationPane,
+          clampIndex(destinationIndex, layout.panes[destinationPane]?.tabs.length ?? 0),
+        ) as WorktreeLayout["panes"];
+        return { ...layout, panes, focusedPane: destinationPane };
       });
     },
-    [updateActiveLayout],
+    [layoutOfTab, updateLayout],
   );
 
-  const swapSlots = useCallback(
-    (a: number, b: number) => {
-      updateActiveLayout((layout) => {
-        const slots = [...layout.slots];
-        const tmp = slots[a];
-        slots[a] = slots[b];
-        slots[b] = tmp;
-        return { ...layout, slots };
-      });
-    },
-    [updateActiveLayout],
+  const reorderTab = useCallback(
+    (tabId: string, pane: PaneIndex, index: number) => updateTabOrder(tabId, pane, index),
+    [updateTabOrder],
+  );
+
+  const moveTabToPane = useCallback(
+    (tabId: string, pane: PaneIndex, index: number) => updateTabOrder(tabId, pane, index),
+    [updateTabOrder],
   );
 
   const zoomTab = useCallback(
@@ -388,9 +335,9 @@ export function TerminalLayoutProvider({ children }: { children: ReactNode }) {
       if (!path) return;
       updateLayout(path, (layout) => ({
         ...layout,
-        tabs: layout.tabs.map((t) =>
-          t.id === tabId ? { ...t, fontZoom: t.fontZoom + delta } : t,
-        ),
+        panes: layout.panes.map((pane) => pane
+          ? { ...pane, tabs: pane.tabs.map((tab) => tab.id === tabId ? { ...tab, fontZoom: tab.fontZoom + delta } : tab) }
+          : null) as WorktreeLayout["panes"],
       }));
     },
     [layoutOfTab, updateLayout],
@@ -402,13 +349,13 @@ export function TerminalLayoutProvider({ children }: { children: ReactNode }) {
       if (!path) return;
       updateLayout(path, (layout) => ({
         ...layout,
-        tabs: layout.tabs.map((t) => (t.id === tabId ? { ...t, title } : t)),
+        panes: layout.panes.map((pane) => pane
+          ? { ...pane, tabs: pane.tabs.map((tab) => tab.id === tabId ? { ...tab, title } : tab) }
+          : null) as WorktreeLayout["panes"],
       }));
     },
     [layoutOfTab, updateLayout],
   );
-
-  // ── Pointer-based tab drag ──────────────────────────────────────────────
 
   const [drag, setDrag] = useState<TabDrag | null>(null);
   const dragRef = useRef<TabDrag | null>(null);
@@ -416,43 +363,48 @@ export function TerminalLayoutProvider({ children }: { children: ReactNode }) {
     dragRef.current = drag;
   }, [drag]);
 
-  const beginDrag = useCallback((tabId: string, x: number, y: number) => {
-    // Prevent native text selection window-wide while dragging (WKWebView
-    // would otherwise select workspace text under the pointer and swallow
-    // the mousemove/mouseup events driving the drag).
+  const beginDrag = useCallback((tabId: string, sourcePane: PaneIndex, x: number, y: number) => {
     document.body.classList.add("ol-dragging");
-    setDrag({ tabId, x, y, overSlot: null });
+    setDrag({ tabId, sourcePane, x, y, targetPane: sourcePane, targetIndex: 0 });
   }, []);
 
   const moveDrag = useCallback((x: number, y: number) => {
-    setDrag((prev) => {
-      if (!prev) return prev;
-      const el = document.elementFromPoint(x, y);
-      const slotEl = el?.closest?.(".slot");
-      const overSlot =
-        slotEl && !slotEl.classList.contains("host-hidden")
-          ? slotFromClass(slotEl)
-          : null;
-      return { ...prev, x, y, overSlot };
+    setDrag((previous) => {
+      if (!previous) return previous;
+      const element = document.elementFromPoint(x, y);
+      const paneElement = element?.closest?.("[data-pane-index]");
+      if (!paneElement) return { ...previous, x, y, targetPane: null, targetIndex: null };
+      const pane = Number(paneElement.getAttribute("data-pane-index")) as PaneIndex;
+      const tabElement = element?.closest?.("[data-pane-tab]");
+      const activePane = activeLayout?.panes[pane];
+      if (!activePane) return { ...previous, x, y, targetPane: pane, targetIndex: 0 };
+      let targetIndex = activePane.tabs.length;
+      if (tabElement) {
+        const tabId = tabElement.getAttribute("data-pane-tab");
+        const tabIndex = activePane.tabs.findIndex((tab) => tab.id === tabId);
+        if (tabIndex !== -1) {
+          const rect = tabElement.getBoundingClientRect();
+          targetIndex = tabIndex + (x > rect.left + rect.width / 2 ? 1 : 0);
+        }
+      }
+      return { ...previous, x, y, targetPane: pane, targetIndex };
     });
-  }, []);
+  }, [activeLayout?.panes]);
 
   const endDrag = useCallback(() => {
     document.body.classList.remove("ol-dragging");
-    const d = dragRef.current;
-    if (d && d.overSlot !== null) {
-      dropTabOnSlot(d.tabId, d.overSlot);
+    const current = dragRef.current;
+    if (current?.targetPane != null && current.targetIndex != null) {
+      moveTabToPane(current.tabId, current.targetPane, current.targetIndex);
     }
     setDrag(null);
-  }, [dropTabOnSlot]);
+  }, [moveTabToPane]);
 
-  // While dragging, track the pointer globally; end on mouseup. preventDefault
-  // stops native text selection from ever starting under the cursor.
   useEffect(() => {
     if (!drag) return;
-    const onMove = (e: MouseEvent) => {
-      e.preventDefault();
-      moveDrag(e.clientX, e.clientY);
+    const onMove = (event: MouseEvent) => {
+      event.preventDefault();
+      moveDrag(event.clientX, event.clientY);
     };
     const onUp = () => endDrag();
     window.addEventListener("mousemove", onMove, { passive: false });
@@ -461,85 +413,55 @@ export function TerminalLayoutProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [drag !== null, moveDrag, endDrag]);
+  }, [drag, moveDrag, endDrag]);
 
-  // The active layout exposed in the old flat shape.
   const state: LayoutState = useMemo(
-    () =>
-      activeLayout
-        ? {
-            tabs: activeLayout.tabs,
-            slots: activeLayout.slots,
-            focusedSlot: activeLayout.focusedSlot,
-            vertical: activeLayout.vertical,
-            bottom: activeLayout.bottom,
-          }
-        : { tabs: [], slots: [null, null, null], focusedSlot: 0, vertical: false, bottom: false },
+    () => activeLayout ?? {
+      panes: [null, null, null],
+      focusedPane: 0,
+      vertical: false,
+      bottom: false,
+    },
     [activeLayout],
   );
 
-  const value = useMemo<TerminalLayoutContextValue>(
-    () => ({
-      state,
-      allTabs,
-      worktreeTabCounts,
-      activeWorktree,
-      shellName,
-      tabOf,
-      slotOf,
-      setActiveWorktree,
-      newTab,
-      launchRunnable,
-      closeTab,
-      closeWorktreeTabs,
-      selectTab,
-      focusSlot,
-      toggleVertical,
-      toggleBottom,
-      dropTabOnSlot,
-      swapSlots,
-      zoomTab,
-      renameTab,
-      drag,
-      beginDrag,
-      moveDrag,
-      endDrag,
-    }),
-    [
-      state,
-      allTabs,
-      worktreeTabCounts,
-      activeWorktree,
-      shellName,
-      tabOf,
-      slotOf,
-      setActiveWorktree,
-      newTab,
-      launchRunnable,
-      closeTab,
-      closeWorktreeTabs,
-      selectTab,
-      focusSlot,
-      toggleVertical,
-      toggleBottom,
-      dropTabOnSlot,
-      swapSlots,
-      zoomTab,
-      renameTab,
-      drag,
-      beginDrag,
-      moveDrag,
-      endDrag,
-    ],
-  );
+  const value = useMemo<TerminalLayoutContextValue>(() => ({
+    state,
+    allTabs,
+    worktreeTabCounts,
+    activeWorktree,
+    shellName,
+    tabOf,
+    paneOf,
+    setActiveWorktree,
+    newTab,
+    launchRunnable,
+    closeTab,
+    closeWorktreeTabs,
+    selectTab,
+    focusSlot,
+    toggleVertical,
+    toggleBottom,
+    reorderTab,
+    moveTabToPane,
+    zoomTab,
+    renameTab,
+    drag,
+    beginDrag,
+    moveDrag,
+    endDrag,
+  }), [
+    state, allTabs, worktreeTabCounts, activeWorktree, shellName, tabOf, paneOf,
+    setActiveWorktree, newTab, launchRunnable, closeTab, closeWorktreeTabs,
+    selectTab, focusSlot, toggleVertical, toggleBottom, reorderTab, moveTabToPane,
+    zoomTab, renameTab, drag, beginDrag, moveDrag, endDrag,
+  ]);
 
-  return (
-    <TerminalLayoutContext.Provider value={value}>{children}</TerminalLayoutContext.Provider>
-  );
+  return <TerminalLayoutContext.Provider value={value}>{children}</TerminalLayoutContext.Provider>;
 }
 
 export function useTerminalLayout(): TerminalLayoutContextValue {
-  const ctx = useContext(TerminalLayoutContext);
-  if (!ctx) throw new Error("useTerminalLayout must be used within TerminalLayoutProvider");
-  return ctx;
+  const context = useContext(TerminalLayoutContext);
+  if (!context) throw new Error("useTerminalLayout must be used within TerminalLayoutProvider");
+  return context;
 }

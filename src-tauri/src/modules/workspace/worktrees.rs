@@ -31,7 +31,11 @@ pub fn sanitize_branch(branch: &str) -> String {
 
 /// Directory name for a managed worktree of a project on a branch.
 pub fn worktree_dir_name(project_path: &str, branch: &str) -> String {
-    format!("overlook-{}-{}", path_hash(project_path), sanitize_branch(branch))
+    format!(
+        "overlook-{}-{}",
+        path_hash(project_path),
+        sanitize_branch(branch)
+    )
 }
 
 /// The actual git checkout for a managed worktree: the cache holds
@@ -91,12 +95,26 @@ pub fn current_branch(dir: &Path) -> Option<String> {
 }
 
 pub fn branch_exists(project: &Path, branch: &str) -> bool {
-    git(&["rev-parse", "--verify", "--quiet", &format!("refs/heads/{branch}")], project).is_ok()
+    git(
+        &[
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            &format!("refs/heads/{branch}"),
+        ],
+        project,
+    )
+    .is_ok()
 }
 
 /// Add a managed worktree. `existing` attaches an already-existing branch;
 /// otherwise a new branch is created from the project's HEAD.
-pub fn add_worktree(project: &Path, branch: &str, dir: &Path, existing: bool) -> Result<(), String> {
+pub fn add_worktree(
+    project: &Path,
+    branch: &str,
+    dir: &Path,
+    existing: bool,
+) -> Result<(), String> {
     let dir_str = dir.to_str().ok_or("worktree path is not valid UTF-8")?;
     if existing {
         git(&["worktree", "add", dir_str, branch], project)?;
@@ -176,7 +194,10 @@ pub fn discover_worktrees(project_path: &str, project_name: &str) -> Vec<Discove
             let checkout = entry.path().join(project_name);
             if checkout.is_dir() {
                 let branch = current_branch(&checkout);
-                found.push(DiscoveredWorktree { dir: checkout, branch });
+                found.push(DiscoveredWorktree {
+                    dir: checkout,
+                    branch,
+                });
             }
         }
     }

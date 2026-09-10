@@ -7,9 +7,7 @@ use tauri::Manager;
 /// resolves and the `$APPCONFIG` asset-protocol scope maps to, so the stored
 /// wallpaper is served by `convertFileSrc` without scope mismatches.
 fn wallpaper_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_config_dir()
-        .map_err(|e| e.to_string())
+    app.path().app_config_dir().map_err(|e| e.to_string())
 }
 
 /// Copy the picked image into the app's config dir so the wallpaper survives
@@ -18,10 +16,7 @@ fn wallpaper_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 /// overwriting the same `background.png` keeps the old cached image until
 /// restart. Old wallpaper files are removed. Returns the full absolute path.
 #[tauri::command]
-pub fn appearance_set_background(
-    app: tauri::AppHandle,
-    path: String,
-) -> Result<String, String> {
+pub fn appearance_set_background(app: tauri::AppHandle, path: String) -> Result<String, String> {
     let src = PathBuf::from(&path);
     if !src.is_file() {
         return Err(format!("not a file: {path}"));

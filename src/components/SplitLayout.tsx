@@ -1,80 +1,73 @@
 import { Button } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
-import { useTerminalLayout } from "../layout/TerminalLayoutContext";
+import { useTerminalLayout, type PaneIndex } from "../layout/TerminalLayoutContext";
 import TerminalHost from "../modules/terminal/TerminalHost";
+import PaneTabs from "./PaneTabs";
 
-/**
- * Positions every tab host into its panel slot (or hides parked/inactive
- * ones) and renders placeholders for empty panels. Hosts are keyed by tab id
- * and never re-parented — only their CSS slot class changes — so PTY sessions
- * survive tab switches, parking, panel reassignment, and worktree switches.
- *
- * All tabs across all worktrees stay mounted; a tab is visible when its
- * worktree is the active one and it sits in a slot of that layout.
- */
+const PANES: PaneIndex[] = [0, 1, 2];
+
 function SplitLayout() {
-  const { state, allTabs, activeWorktree, slotOf, focusSlot, newTab, drag } =
-    useTerminalLayout();
-
+  const { state, allTabs, activeWorktree, paneOf, focusSlot, newTab, drag } = useTerminalLayout();
   const layoutClass = `layout-area${state.vertical ? " vertical" : ""}${state.bottom ? " bottom" : ""}`;
+  const draggedTab = drag ? allTabs.find((tab) => tab.id === drag.tabId) : null;
 
-  const draggedTab = drag ? allTabs.find((t) => t.id === drag.tabId) : null;
+  const paneVisible = (pane: PaneIndex) =>
+    pane === 0 || (pane === 1 ? state.vertical : state.bottom);
 
   return (
     <div className={layoutClass}>
-      {allTabs.map((tab) => {
-        const slot = slotOf(tab.id);
-        const visible = tab.worktree === activeWorktree && slot !== null;
-        const active = visible && slot === state.focusedSlot;
-        const dropTarget = visible && drag !== null && drag.overSlot === slot;
-        const className = [
-          "slot",
-          visible ? `slot-${slot}` : "host-hidden",
-          visible && active ? "slot-active" : visible ? "slot-inactive" : "",
-          dropTarget ? "slot-drop-target" : "",
-        ]
-          .filter(Boolean)
-          .join(" ");
+      {PANES.map((paneIndex) => {
+        const pane = state.panes[paneIndex];
+        if (!pane || !paneVisible(paneIndex)) return null;
+        const focused = state.focusedPane === paneIndex;
+        const dropTarget = drag?.targetPane === paneIndex;
         return (
-          <div key={tab.id} className={className}>
-            <TerminalHost tabId={tab.id} slot={visible ? slot : null} visible={visible} />
+          <div
+            key={`pane-${paneIndex}`}
+            className={`slot pane-frame slot-${paneIndex}${focused ? " slot-active" : " slot-inactive"}${dropTarget ? " slot-drop-target" : ""}`}
+            data-pane-index={paneIndex}
+          >
+            <PaneTabs
+              pane={paneIndex}
+              tabs={pane.tabs}
+              activeTabId={pane.activeTabId}
+              focused={focused}
+              dropIndex={drag?.targetPane === paneIndex ? drag.targetIndex : null}
+              onFocus={() => focusSlot(paneIndex)}
+            />
+            {pane.tabs.length === 0 && (
+              <SlotPlaceholder
+                highlighted={dropTarget}
+                onActivate={() => {
+                  focusSlot(paneIndex);
+                  newTab(paneIndex);
+                }}
+              />
+            )}
           </div>
         );
       })}
 
-      {/* Placeholders for empty panels (also drop targets). */}
-      {state.slots[0] === null && (
-        <SlotPlaceholder
-          slot={0}
-          highlighted={drag?.overSlot === 0}
-          onActivate={() => {
-            focusSlot(0);
-            newTab();
-          }}
-        />
-      )}
-      {state.vertical && state.slots[1] === null && (
-        <SlotPlaceholder
-          slot={1}
-          highlighted={drag?.overSlot === 1}
-          onActivate={() => {
-            focusSlot(1);
-            newTab();
-          }}
-        />
-      )}
-      {state.bottom && state.slots[2] === null && (
-        <SlotPlaceholder
-          slot={2}
-          highlighted={drag?.overSlot === 2}
-          onActivate={() => {
-            focusSlot(2);
-            newTab();
-          }}
-        />
-      )}
+      {allTabs.map((tab) => {
+        const owner = paneOf(tab.id);
+        const pane = owner == null ? null : state.panes[owner];
+        const visible = tab.worktree === activeWorktree
+          && owner != null
+          && paneVisible(owner)
+          && pane != null
+          && pane.activeTabId === tab.id;
+        const dropTarget = drag?.targetPane === owner;
+        return (
+          <div
+            key={tab.id}
+            className={`slot-host slot-${owner ?? 0}${visible ? "" : " host-hidden"}${dropTarget ? " slot-drop-target" : ""}`}
+            data-pane-index={owner ?? undefined}
+          >
+            <TerminalHost tabId={tab.id} slot={visible ? owner : null} visible={visible} />
+          </div>
+        );
+      })}
 
-      {/* Floating drag ghost following the pointer. */}
       {drag && draggedTab && (
         <div className="tab-drag-ghost" style={{ left: drag.x, top: drag.y }}>
           {draggedTab.title}
@@ -85,16 +78,13 @@ function SplitLayout() {
 }
 
 interface SlotPlaceholderProps {
-  slot: number;
   highlighted: boolean;
   onActivate: () => void;
 }
 
-function SlotPlaceholder({ slot, highlighted, onActivate }: SlotPlaceholderProps) {
+function SlotPlaceholder({ highlighted, onActivate }: SlotPlaceholderProps) {
   return (
-    <div
-      className={`slot slot-${slot} slot-placeholder${highlighted ? " slot-drop-target" : ""}`}
-    >
+    <div className={`slot-placeholder${highlighted ? " slot-drop-target" : ""}`}>
       <Button
         type="text"
         size="small"

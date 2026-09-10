@@ -15,7 +15,7 @@ use serde::Serialize;
 use tauri::ipc::Channel;
 use tauri::State;
 
-use session::{Session, spawn_session};
+use session::{spawn_session, Session};
 
 /// Events streamed from Rust to the frontend for a PTY session.
 #[derive(Clone, Serialize, serde::Deserialize)]
@@ -97,11 +97,7 @@ pub fn pty_open(
 
 /// Write raw input bytes to the PTY of a session.
 #[tauri::command]
-pub fn pty_write(
-    manager: State<PtyManager>,
-    session_id: u32,
-    data: Vec<u8>,
-) -> Result<(), String> {
+pub fn pty_write(manager: State<PtyManager>, session_id: u32, data: Vec<u8>) -> Result<(), String> {
     let session = manager
         .get(session_id)
         .ok_or_else(|| format!("no such session: {session_id}"))?;

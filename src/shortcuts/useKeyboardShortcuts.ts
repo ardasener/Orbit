@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useTerminalLayout } from "../layout/TerminalLayoutContext";
+import { adjacentTabId } from "../layout/paneLayout";
 import { useSettings } from "../settings/SettingsContext";
 import { getShortcutAction } from "./actionRegistry";
 import { ACTIONS, matchesEvent, type ActionId } from "./keybindings";
@@ -90,8 +91,8 @@ export function useKeyboardShortcuts(): void {
         moveTab(-1);
         break;
       case "closeTab": {
-        const focused = l.state.slots[l.state.focusedSlot];
-        if (focused != null) l.closeTab(focused);
+        const pane = l.state.panes[l.state.focusedPane];
+        if (pane?.activeTabId != null) l.closeTab(pane.activeTabId);
         break;
       }
       case "newTerminal":
@@ -110,26 +111,23 @@ export function useKeyboardShortcuts(): void {
         getShortcutAction("openLauncher")?.();
         break;
       case "zoomIn": {
-        const focused = l.state.slots[l.state.focusedSlot];
+        const focused = l.state.panes[l.state.focusedPane]?.activeTabId;
         if (focused != null) l.zoomTab(focused, 1);
         break;
       }
       case "zoomOut": {
-        const focused = l.state.slots[l.state.focusedSlot];
+        const focused = l.state.panes[l.state.focusedPane]?.activeTabId;
         if (focused != null) l.zoomTab(focused, -1);
         break;
       }
     }
   }
 
-  /** Select the tab adjacent to the focused one within the active layout. */
+  /** Select the tab adjacent to the focused one within the focused pane. */
   function moveTab(delta: number): void {
     const l = layoutRef.current;
-    const { tabs, slots, focusedSlot } = l.state;
-    if (tabs.length === 0) return;
-    const focusedId = slots[focusedSlot];
-    const index = focusedId != null ? tabs.findIndex((t) => t.id === focusedId) : -1;
-    const next = (index === -1 ? 0 : (index + delta + tabs.length) % tabs.length);
-    l.selectTab(tabs[next].id);
+    const pane = l.state.panes[l.state.focusedPane];
+    const next = pane ? adjacentTabId(pane, delta) : null;
+    if (next != null) l.selectTab(next);
   }
 }

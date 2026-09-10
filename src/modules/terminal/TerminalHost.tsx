@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Terminal } from "@xterm/xterm";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { useSettings } from "../../settings/SettingsContext";
-import { useTerminalLayout } from "../../layout/TerminalLayoutContext";
+import { useTerminalLayout, type PaneIndex } from "../../layout/TerminalLayoutContext";
 import { registerShortcutAction } from "../../shortcuts/actionRegistry";
 import type { ActionId } from "../../shortcuts/keybindings";
 import { shouldAllowTerminalTransparency, xtermOptions } from "../../themes/xterm";
@@ -37,7 +37,7 @@ interface TerminalHostProps {
   /** Stable identity for this host's PTY session. */
   tabId: string;
   /** Panel slot this host occupies, or null when parked. */
-  slot: number | null;
+  slot: PaneIndex | null;
   /** Whether the host is currently on screen (hidden hosts skip fitting). */
   visible: boolean;
 }

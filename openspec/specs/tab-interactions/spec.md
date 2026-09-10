@@ -1,34 +1,55 @@
 ## Purpose
 
-Defines pointer-based tab drag-and-drop between panes (repositioning and splitting) without HTML5 drag events.
+Defines pane-local tab drag-and-drop, pane focus, terminal zoom, and automatic tab titles without HTML5 drag events.
 
 ## Requirements
 
 ### Requirement: Drag tabs onto panes
-The application SHALL let the user drag a tab from the tab bar onto a pane slot, assigning that tab to the pane. If the dragged tab was already shown in another pane, the two panes SHALL swap their tabs.
+The application SHALL let the user drag a tab from one pane's tab bar to another pane or its tab bar. Dropping onto a pane tab bar at a tab position SHALL insert the tab at that position; dropping onto the pane body SHALL append it. The moved tab SHALL become active in the destination pane and SHALL be removed from the source pane.
 
-#### Scenario: Drag a parked tab onto a pane
-- **WHEN** the user drags a tab that is not currently shown in any pane onto a pane
-- **THEN** that tab SHALL appear in the pane and the pane's previous tab SHALL park (remain alive in the tab bar)
+#### Scenario: Move a tab to another pane
+- **WHEN** the user drags a tab from pane A onto pane B
+- **THEN** the tab SHALL be removed from pane A
+- **AND** the tab SHALL be inserted into pane B
+- **AND** the tab SHALL become active in pane B
 
-#### Scenario: Drag a shown tab onto another pane swaps them
-- **WHEN** the user drags a tab that is currently shown in pane A onto pane B
-- **THEN** pane A SHALL receive pane B's tab and pane B SHALL receive the dragged tab
+#### Scenario: Insert at a tab position
+- **WHEN** the user drops a tab over a position between tabs in another pane's tab bar
+- **THEN** the tab SHALL be inserted at that position in the destination pane's order
+
+#### Scenario: Drop on pane body appends
+- **WHEN** the user drops a tab onto a pane body outside its tab headers
+- **THEN** the tab SHALL be appended to the destination pane's tab order
+- **AND** the tab SHALL become active there
+
+#### Scenario: Empty source pane remains available
+- **WHEN** moving the last tab out of a pane
+- **THEN** the source pane SHALL remain initialized
+- **AND** it SHALL display the empty-panel placeholder
 
 #### Scenario: Drop target highlights
-- **WHEN** the user drags a tab over a pane
-- **THEN** the pane SHALL show a drop highlight until the drag leaves or the tab is dropped
+- **WHEN** the user drags a tab over a pane or tab insertion position
+- **THEN** the destination SHALL show a drop highlight until the drag leaves or the tab is dropped
 
 ### Requirement: Active pane indication
-The application SHALL visually distinguish the focused pane by dimming the accent border of non-focused panes, and clicking inside a pane SHALL make it focused.
-
-#### Scenario: Non-focused panes have dimmed borders
-- **WHEN** more than one pane is visible
-- **THEN** the focused pane SHALL render its accent border at full brightness and the other panes' accent borders SHALL be dimmed, while their terminal content remains at full brightness
+The application SHALL visually distinguish the focused pane by using a brighter neutral tab-bar surface for the focused pane and a dimmer neutral surface for other visible panes. Clicking inside a pane SHALL make it focused.
 
 #### Scenario: Clicking a terminal focuses its pane
 - **WHEN** the user clicks inside a pane's terminal
-- **THEN** that pane SHALL become the focused pane (and the border dimming SHALL shift accordingly)
+- **THEN** that pane SHALL become focused
+- **AND** its tab bar SHALL use the focused styling
+
+#### Scenario: Moving a tab focuses its destination
+- **WHEN** a tab is dropped into another pane
+- **THEN** the destination pane SHALL become focused
+
+### Requirement: Reorder tabs within a pane
+The application SHALL allow a user to reorder tabs within a pane by dragging a tab to another position in that pane's tab bar.
+
+#### Scenario: Reorder a tab
+- **WHEN** a tab is dropped at a different position in its owning pane's tab bar
+- **THEN** the pane's tab order SHALL update to place the tab at that position
+- **AND** the reordered tab SHALL remain active
 
 ### Requirement: Per-pane font zoom
 The application SHALL zoom the terminal font of the pane under the pointer with Ctrl/Cmd + mouse wheel (or the equivalent trackpad pinch), relative to a configurable default font size.
@@ -47,10 +68,10 @@ The application SHALL zoom the terminal font of the pane under the pointer with 
 
 #### Scenario: Zoom does not zoom the page
 - **WHEN** the user zooms with Ctrl/Cmd + wheel over a terminal
-- **THEN** the application page SHALL NOT zoom (the webview zoom SHALL be suppressed)
+- **THEN** the application page SHALL NOT zoom
 
 ### Requirement: Font zoom works inside TUIs
-The per-pane font zoom (Ctrl/Cmd + mouse wheel or trackpad pinch) SHALL work while a TUI application with mouse reporting (e.g. htop, vim, opencode) is running in the terminal.
+The per-pane font zoom SHALL work while a TUI application with mouse reporting (e.g. htop, vim, opencode) is running in the terminal.
 
 #### Scenario: Zoom inside a TUI
 - **WHEN** a TUI with mouse reporting is running and the user zooms with Ctrl/Cmd + wheel over the terminal
@@ -62,7 +83,7 @@ The per-pane font zoom (Ctrl/Cmd + mouse wheel or trackpad pinch) SHALL work whi
 - **THEN** the TUI SHALL receive the wheel event for its native scrolling
 
 #### Scenario: Bare-shell zoom unchanged
-- **WHEN** no TUI is running (bare shell prompt) and the user zooms with Ctrl/Cmd + wheel
+- **WHEN** no TUI is running and the user zooms with Ctrl/Cmd + wheel
 - **THEN** the pane's font SHALL zoom as before
 
 #### Scenario: Zoom remains bounded and per-pane
@@ -77,16 +98,16 @@ The settings option for the terminal font size SHALL be labeled "Default font si
 - **THEN** the terminal size control SHALL be labeled "Default font size"
 
 ### Requirement: Automatic tab titles
-The application SHALL title tabs from the process running in them, falling back to the default shell name (e.g. "zsh") when the terminal is idle. New tabs SHALL default to the shell name — the "Terminal N" naming is retired.
+The application SHALL title tabs from the process running in them, falling back to the default shell name when the terminal is idle. New tabs SHALL default to the shell name.
 
 #### Scenario: Title follows the running process
-- **WHEN** a process (e.g., `vim`, `npm`) is running in the foreground of a terminal
+- **WHEN** a process is running in the foreground of a terminal
 - **THEN** the tab's title SHALL reflect that process's name
 
 #### Scenario: Idle terminals keep the default title
-- **WHEN** a terminal is idle (only the shell is running)
-- **THEN** the tab SHALL keep its shell-name title (e.g. "zsh")
+- **WHEN** a terminal is idle
+- **THEN** the tab SHALL keep its shell-name title
 
 #### Scenario: New tabs default to the shell name
-- **WHEN** a tab is created via the `+` button or by opening a split with no parked terminals
-- **THEN** the new tab SHALL be titled with the shell name (e.g. "zsh"), not a numeric placeholder
+- **WHEN** a tab is created via a pane add control, the global new-terminal action, or by opening a split
+- **THEN** the new tab SHALL be titled with the shell name, not a numeric placeholder

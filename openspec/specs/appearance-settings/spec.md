@@ -3,11 +3,11 @@
 Lets users tailor the application's look — palette, UI font and scale, terminal font and size, and background wallpaper — with choices persisted across restarts.
 ## Requirements
 ### Requirement: Settings modal is accessible
-The application SHALL provide a settings modal reachable from a gear button in the workspace sidebar header.
+The application SHALL provide a settings modal reachable from a gear button in the workspace sidebar header and SHALL include Appearance, Terminal, and File tools sections.
 
 #### Scenario: Open settings from sidebar
 - **WHEN** the user clicks the gear button in the sidebar header
-- **THEN** a settings modal opens with Appearance and Terminal sections
+- **THEN** a settings modal opens with Appearance, Terminal, and File tools sections
 
 ### Requirement: Theme selection drives both UI and terminal
 The application SHALL let the user choose one generated Base16 palette that drives both the AntD UI chrome and the terminal colors, including ANSI colors. The selector SHALL be searchable and SHALL display a compact color preview beside each theme name.
@@ -79,6 +79,24 @@ The settings modal SHALL offer a window-control-position choice (left | right, d
 - **WHEN** the user opens the appearance settings on macOS
 - **THEN** no window-control-position choice SHALL be shown
 
+### Requirement: File tool settings
+The settings modal SHALL provide persisted executable settings for the terminal file viewer and editor, plus a persisted default file left-click action. Blank viewer and editor values SHALL mean use the defaults `view` and `vim`.
+
+#### Scenario: Configure viewer and editor
+- **WHEN** the user changes the viewer, editor, or default file click action
+- **THEN** the setting SHALL apply to subsequent file actions
+- **AND** the setting SHALL persist across application restarts
+
+#### Scenario: Default file tool settings
+- **WHEN** no file tool settings exist
+- **THEN** the viewer SHALL default to `view`
+- **AND** the editor SHALL default to `vim`
+- **AND** the default file click action SHALL be Copy Abs. Path
+
+#### Scenario: Invalid click action repairs
+- **WHEN** a stored default file click action is not one of the supported actions
+- **THEN** the application SHALL use Copy Abs. Path without crashing
+
 #### Scenario: Changing the position updates the controls
 - **WHEN** the user changes the window control position
 - **THEN** the tab bar's window controls SHALL move to the chosen edge immediately, and the choice SHALL persist across restarts
@@ -105,4 +123,3 @@ All application modal dialogs, confirmation dialogs, appearance dropdowns, and c
 #### Scenario: Context menu follows the active palette
 - **WHEN** the user opens a project or worktree context menu under a light or dark palette
 - **THEN** the menu surface, item text, hover states, danger items, and dividers SHALL use palette-aware colors
-

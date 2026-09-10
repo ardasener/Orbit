@@ -103,55 +103,25 @@ body.has-wallpaper .slot {
   overflow: hidden;
 }
 
-/* One panel per slot; accent-colored border identifies the panel's tab.
-   Slots are absolutely positioned, so parent padding is ignored — the
-   outer margin and inter-panel gutters are encoded in the insets. */
+/* One fixed pane per slot. Slots are absolutely positioned, so parent padding
+   is ignored — the outer margin and inter-panel gutters are encoded in the
+   insets. */
 .slot {
   position: absolute;
   overflow: hidden;
-  padding: 4px;
+  padding: 0;
   border-radius: 6px;
-  border: 1px solid var(--ol-accent-0);
+  border: 1px solid var(--ol-border);
   background: var(--ol-bg);
 }
 
-.slot-1 {
-  border-color: var(--ol-accent-1);
-}
-
-.slot-2 {
-  border-color: var(--ol-accent-2);
-}
-
-/* Inactive panes: dim the accent border (the activity signal); terminal
-   content stays full-brightness. */
 .slot {
-  transition: border-color 0.15s;
+  transition: background 0.15s;
 }
 
-.slot-inactive.slot-0 {
-  border-color: var(--ol-accent-0-dim);
-}
-
-.slot-inactive.slot-1 {
-  border-color: var(--ol-accent-1-dim);
-}
-
-.slot-inactive.slot-2 {
-  border-color: var(--ol-accent-2-dim);
-}
-
-/* Drop target for a dragged tab: accent-colored ring. */
-.slot-drop-target.slot-0 {
-  box-shadow: 0 0 0 2px var(--ol-accent-0);
-}
-
-.slot-drop-target.slot-1 {
-  box-shadow: 0 0 0 2px var(--ol-accent-1);
-}
-
-.slot-drop-target.slot-2 {
-  box-shadow: 0 0 0 2px var(--ol-accent-2);
+/* Drop targets remain neutral; the ring is temporary drag feedback only. */
+.slot-drop-target {
+  box-shadow: 0 0 0 2px var(--ol-primary);
 }
 
 /* Floating ghost while dragging a tab (pointer-based drag; no HTML5 DnD). */
@@ -181,6 +151,25 @@ body.ol-dragging * {
 
 .host-hidden {
   display: none;
+}
+
+.pane-frame {
+  z-index: 2;
+  pointer-events: none;
+  border: none;
+  background: transparent;
+}
+
+.slot-host {
+  position: absolute;
+  overflow: hidden;
+  z-index: 1;
+  border-radius: 6px;
+  background: var(--ol-bg);
+}
+
+.slot-host .terminal-host {
+  top: 24px;
 }
 
 /* single: slot0 fills with an 8px outer margin */
@@ -221,9 +210,12 @@ body.ol-dragging * {
 
 /* Empty panel placeholder */
 .slot-placeholder {
+  position: absolute;
+  inset: 24px 0 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: auto;
 }
 
 .slot-placeholder-button {

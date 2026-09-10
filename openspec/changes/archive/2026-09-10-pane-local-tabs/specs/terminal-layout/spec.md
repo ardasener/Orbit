@@ -1,8 +1,4 @@
-## Purpose
-
-Structures the terminal area: global chrome plus fixed single or split panes, each hosting an independent tab workspace.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Tab bar with one terminal per tab
 The application SHALL display global top-bar chrome without a shared tab strip. Each initialized terminal pane SHALL display its own tab bar, where each tab represents one live terminal session. A pane tab bar SHALL scroll horizontally when its tabs overflow the available width.
@@ -34,7 +30,7 @@ The application SHALL create a new terminal tab in the focused pane via the glob
 - **AND** the pane SHALL display the empty-panel placeholder
 
 ### Requirement: Split layouts
-The application SHALL support four layout states controlled by two independent toggle buttons on the global top bar: single, vertical split (two side-by-side panes at 50/50), bottom split (a bottom pane at 30% height, full width, above which the top pane takes 70%), and vertical-plus-bottom combined (top row split 50/50 over a 30% bottom pane). Each split location SHALL own an independent pane tab workspace.
+The application SHALL support four layout states controlled by the two independent split toggles: single, vertical, bottom, and vertical-plus-bottom. Each split location SHALL own an independent pane tab workspace.
 
 #### Scenario: First split creates a pane shell
 - **WHEN** the user enables a split whose pane has never been initialized
@@ -44,18 +40,6 @@ The application SHALL support four layout states controlled by two independent t
 - **WHEN** the user disables a split and later enables it again
 - **THEN** the pane SHALL restore its prior tabs, ordering, active tab, and live sessions
 - **AND** no tab SHALL be moved automatically to another pane
-
-#### Scenario: Toggle vertical split
-- **WHEN** the user clicks the vertical-split toggle
-- **THEN** the layout SHALL alternate between a single pane and two side-by-side panes of equal width, regardless of the bottom toggle's state
-
-#### Scenario: Toggle bottom split alone
-- **WHEN** the user clicks the bottom-split toggle while the vertical split is off
-- **THEN** a bottom pane SHALL appear below a single full-width top pane (70/30), without enabling the vertical split
-
-#### Scenario: Vertical and bottom splits compose
-- **WHEN** both toggles are on
-- **THEN** the layout SHALL show two equal-width panes in the top 70% and a full-width bottom pane at 30%
 
 #### Scenario: Split toggles remain independent
 - **WHEN** the user toggles one split while the other split is enabled
@@ -95,10 +79,3 @@ The application SHALL distinguish the focused pane through neutral tab-bar surfa
 #### Scenario: Pane locations share styling
 - **WHEN** panes are visible in any split layout
 - **THEN** all pane tab bars SHALL use the same neutral color scheme regardless of pane slot
-
-### Requirement: macOS window buttons merge into the tab bar
-On macOS, the native title bar SHALL be hidden and the traffic lights SHALL be positioned over the global top bar, which SHALL act as the window drag region.
-
-#### Scenario: Overlay title bar on macOS
-- **WHEN** the app runs on macOS
-- **THEN** the native title bar SHALL be hidden, the traffic lights SHALL float over the global top bar's left side, and the global top bar SHALL drag the window while its controls remain clickable

@@ -49,7 +49,11 @@ fn project_info(entry: &projects::ProjectEntry) -> Option<ProjectInfo> {
     }
     let name = dir.file_name()?.to_string_lossy().into_owned();
     let is_git = worktrees::is_git_repo(&dir);
-    let branch = if is_git { worktrees::current_branch(&dir) } else { None };
+    let branch = if is_git {
+        worktrees::current_branch(&dir)
+    } else {
+        None
+    };
 
     let mut worktrees: Vec<WorktreeInfo> = worktrees::discover_worktrees(&path, &name)
         .into_iter()

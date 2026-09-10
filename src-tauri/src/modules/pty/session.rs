@@ -66,7 +66,9 @@ fn is_usable_shell(path: &str) -> bool {
 
 #[cfg(windows)]
 fn is_usable_shell(path: &str) -> bool {
-    std::fs::metadata(path).map(|m| m.is_file()).unwrap_or(false)
+    std::fs::metadata(path)
+        .map(|m| m.is_file())
+        .unwrap_or(false)
 }
 
 #[cfg(target_os = "macos")]
@@ -390,7 +392,10 @@ pub fn spawn_session(
             // exit anyway rather than hanging the session forever.
             let _ = reader_done_rx.recv_timeout(Duration::from_secs(2));
             exited.store(true, Ordering::Release);
-            let _ = waiter_tx.send(TerminalEvent::Exit { session_id: id, code });
+            let _ = waiter_tx.send(TerminalEvent::Exit {
+                session_id: id,
+                code,
+            });
             manager.remove(id);
         })
         .map_err(|e| e.to_string())?;
@@ -587,7 +592,8 @@ mod tests {
             Ok(())
         });
 
-        let session = spawn_session(1, None, PtySize::default(), channel, manager.clone(), None).unwrap();
+        let session =
+            spawn_session(1, None, PtySize::default(), channel, manager.clone(), None).unwrap();
 
         session.write(b"echo roundtrip-ok\r\n").unwrap();
 
@@ -631,8 +637,15 @@ mod tests {
         });
 
         let command = "echo run-test-ok".to_string();
-        let session =
-            spawn_session(2, None, PtySize::default(), channel, manager.clone(), Some(command)).unwrap();
+        let session = spawn_session(
+            2,
+            None,
+            PtySize::default(),
+            channel,
+            manager.clone(),
+            Some(command),
+        )
+        .unwrap();
 
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
         let mut saw_output = false;
@@ -650,7 +663,10 @@ mod tests {
                 Err(_) => continue,
             }
         }
-        assert!(saw_output, "command output never arrived through the channel");
+        assert!(
+            saw_output,
+            "command output never arrived through the channel"
+        );
 
         session.kill();
         manager.remove(2);
@@ -767,8 +783,15 @@ mod pty_integration {
             pixel_width: 0,
             pixel_height: 0,
         };
-        let session = spawn_session(id, cwd.map(str::to_string), size, channel, manager.clone(), command)
-            .expect("session spawns");
+        let session = spawn_session(
+            id,
+            cwd.map(str::to_string),
+            size,
+            channel,
+            manager.clone(),
+            command,
+        )
+        .expect("session spawns");
 
         // Drain output until the deadline (or session exit, for command runs).
         // A single recv timeout is NOT the end of data (the shell can pause
@@ -844,8 +867,11 @@ mod pty_integration {
         let zdotdir = std::env::temp_dir().join(format!("ol-test-zdotdir-{}", std::process::id()));
         std::fs::create_dir_all(&zdotdir).expect("create ZDOTDIR");
         let zshrc_path = zdotdir.join(".zshrc");
-        std::fs::write(&zshrc_path, "PROMPT='\u{2570}\u{2500}$ '\nRPROMPT='%(?..%? \u{21b5})'\n")
-            .expect("write .zshrc");
+        std::fs::write(
+            &zshrc_path,
+            "PROMPT='\u{2570}\u{2500}$ '\nRPROMPT='%(?..%? \u{21b5})'\n",
+        )
+        .expect("write .zshrc");
         let zdotdir_original = std::env::var("ZDOTDIR").ok();
         std::env::set_var("ZDOTDIR", &zdotdir);
 
@@ -870,8 +896,14 @@ mod pty_integration {
             let _ = tx.send(event);
             Ok(())
         });
-        let size = PtySize { rows: 39, cols: 75, pixel_width: 0, pixel_height: 0 };
-        let session = spawn_session(102, None, size, channel, manager.clone(), None).expect("spawn");
+        let size = PtySize {
+            rows: 39,
+            cols: 75,
+            pixel_width: 0,
+            pixel_height: 0,
+        };
+        let session =
+            spawn_session(102, None, size, channel, manager.clone(), None).expect("spawn");
         // Let the shell print its prompt.
         std::thread::sleep(Duration::from_millis(1500));
         // A failing command: `sh -c 'exit 127'` → RPROMPT renders "127 ↵".
@@ -913,7 +945,10 @@ mod pty_integration {
         // The RPROMPT forward/back math: "127 ↵" is 5 glyphs wide. In the C
         // locale (no fix) zsh counts the 3-byte ↵ as 3 columns → width 7.
         let text = String::from_utf8_lossy(&out);
-        let prompt = text.rfind("\u{2570}\u{2500}").map(|i| &text[i..]).unwrap_or("");
+        let prompt = text
+            .rfind("\u{2570}\u{2500}")
+            .map(|i| &text[i..])
+            .unwrap_or("");
         let (fwd, back) = extract_rprompt_cursor_math(prompt.as_bytes())
             .expect("RPROMPT cursor-forward/back pair must be present");
         let width = back.saturating_sub(fwd);
@@ -941,8 +976,14 @@ mod pty_integration {
         // The interactive shell echoes the command with a prompt, then prints
         // the output.
         let text = String::from_utf8_lossy(&out);
-        assert!(text.contains('\u{2570}'), "expected ╰ in output, got: {text:?}");
-        assert!(text.contains('\u{21b5}'), "expected ↵ in output, got: {text:?}");
+        assert!(
+            text.contains('\u{2570}'),
+            "expected ╰ in output, got: {text:?}"
+        );
+        assert!(
+            text.contains('\u{21b5}'),
+            "expected ↵ in output, got: {text:?}"
+        );
         assert!(
             !text.contains('\u{FFFD}'),
             "replacement char found — bytes corrupted: {text:?}"
@@ -964,14 +1005,25 @@ mod pty_integration {
             let _ = tx.send(event);
             Ok(())
         });
-        let initial = PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 };
-        let session = spawn_session(104, None, initial, channel, manager.clone(), None).expect("spawn");
+        let initial = PtySize {
+            rows: 24,
+            cols: 80,
+            pixel_width: 0,
+            pixel_height: 0,
+        };
+        let session =
+            spawn_session(104, None, initial, channel, manager.clone(), None).expect("spawn");
         let _ = rx; // reader thread keeps running; we only need session.resize
 
         // Drain anything the shell printed so far (non-blocking).
         std::thread::sleep(Duration::from_millis(300));
 
-        let resized = PtySize { rows: 39, cols: 132, pixel_width: 0, pixel_height: 0 };
+        let resized = PtySize {
+            rows: 39,
+            cols: 132,
+            pixel_width: 0,
+            pixel_height: 0,
+        };
         session.resize(resized).expect("resize succeeds");
 
         let got = session.kernel_size().expect("kernel size readable");

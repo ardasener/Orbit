@@ -19,6 +19,7 @@ import {
   Popconfirm,
   Tooltip,
   Tree,
+  Radio,
 } from "antd";
 import type { TreeDataNode, TreeProps } from "antd";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -31,6 +32,7 @@ import {
 import { useTerminalLayout } from "../layout/TerminalLayoutContext";
 import { registerShortcutAction } from "../shortcuts/actionRegistry";
 import "./WorkspaceSidebar.css";
+import FileBrowser from "./FileBrowser";
 
 interface WorkspaceSidebarProps {
   /** Open the panel when it's collapsed (used by the focus shortcut). */
@@ -61,6 +63,7 @@ function WorkspaceSidebar({ onReveal }: WorkspaceSidebarProps) {
     removeWorktree,
   } = useWorkspace();
   const { activeWorktree, setActiveWorktree } = useTerminalLayout();
+  const [mode, setMode] = useState<"workspaces" | "files">("workspaces");
 
   // Fork modal (one at a time, tracked by project path).
   const [forkProject, setForkProject] = useState<string | null>(null);
@@ -426,6 +429,16 @@ function WorkspaceSidebar({ onReveal }: WorkspaceSidebarProps) {
 
   return (
     <>
+      <Radio.Group
+        className="sidebar-mode-selector"
+        value={mode}
+        onChange={(event) => setMode(event.target.value)}
+        optionType="button"
+        buttonStyle="solid"
+        size="small"
+        options={[{ value: "workspaces", label: "Workspaces" }, { value: "files", label: "Files" }]}
+      />
+      {mode === "workspaces" ? <>
       <div className="app-sider-header" ref={searchRef}>
         <Input
           size="small"
@@ -464,6 +477,7 @@ function WorkspaceSidebar({ onReveal }: WorkspaceSidebarProps) {
           onSelect={onSelect}
           blockNode
         />
+      </> : <FileBrowser />}
       {forkModal}
       {renameModal}
       <Popconfirm

@@ -16,6 +16,7 @@ import {
   snapUiScale,
   useSettings,
   type Runnable,
+  type FileClickAction,
 } from "../../settings/SettingsContext";
 import { termFontStack } from "../../themes/xterm";
 import { uiFontStack } from "../../themes/antd";
@@ -412,6 +413,37 @@ function SettingsModal({ open, onClose }: SettingsModalProps) {
                       onChange={(v) => update({ termSize: v ?? 13 })}
                     />
                   </Tooltip>
+                </div>
+              </section>
+            ),
+          },
+          {
+            key: "files",
+            label: "File tools",
+            children: (
+              <section className="settings-section">
+                <h3 className="settings-section-title">File tools</h3>
+                <div className="settings-field">
+                  <span className="settings-label">Viewer executable</span>
+                  <Input value={settings.fileViewer} onChange={(e) => update({ fileViewer: e.target.value })} placeholder="view" />
+                </div>
+                <div className="settings-field">
+                  <span className="settings-label">Editor executable</span>
+                  <Input value={settings.fileEditor} onChange={(e) => update({ fileEditor: e.target.value })} placeholder="vim" />
+                </div>
+                <div className="settings-field">
+                  <span className="settings-label">File left-click action</span>
+                  <Select<FileClickAction>
+                    value={settings.fileClickAction}
+                    onChange={(fileClickAction) => update({ fileClickAction })}
+                    style={{ width: "100%" }}
+                    options={[
+                      { value: "copyAbs", label: "Copy Abs. Path" },
+                      { value: "copyRel", label: "Copy Rel. Path" },
+                      { value: "view", label: "View" },
+                      { value: "edit", label: "Edit" },
+                    ]}
+                  />
                 </div>
               </section>
             ),

@@ -1,8 +1,4 @@
-## Purpose
-
-Renders each session as a closable pane-local Ant Design tab bar, with active-state and overflow scrolling.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Tag-based tab strip
 The application SHALL render each initialized pane's tabs as a pane-local Ant Design `Tabs` bar rather than a shared Ant Design `Tag` strip. Each tab SHALL show its title and close control using standard neutral tab styling. The focused pane's tab bar SHALL be visually brighter than inactive pane tab bars.

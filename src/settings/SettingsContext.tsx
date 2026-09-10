@@ -56,6 +56,9 @@ export interface Settings {
   windowControlsPosition: WindowControlsPosition;
   /** Per-action keyboard shortcuts (primary + optional alternative). */
   keybindings: Record<ActionId, Keybinding>;
+  fileViewer: string;
+  fileEditor: string;
+  fileClickAction: FileClickAction;
   /** Full-window background image (stored filename + blur/opacity). */
   background: {
     image: string | null;
@@ -69,6 +72,9 @@ export interface Settings {
     stripBackground: boolean;
   };
 }
+
+export type FileClickAction = "copyAbs" | "copyRel" | "view" | "edit";
+export const FILE_CLICK_ACTIONS: FileClickAction[] = ["copyAbs", "copyRel", "view", "edit"];
 
 export const BACKGROUND_BLUR_MAX = 60;
 export const BACKGROUND_OPACITY_MIN = 0.05;
@@ -99,6 +105,9 @@ const DEFAULTS: Settings = {
   runnables: DEFAULT_RUNNABLES,
   windowControlsPosition: "right",
   keybindings: DEFAULT_KEYBINDINGS,
+  fileViewer: "view",
+  fileEditor: "vim",
+  fileClickAction: "copyAbs",
   background: { image: null, blur: 20, opacity: 0.5, remapBackground: false, stripBackground: false },
 };
 
@@ -158,6 +167,17 @@ function loadSettings(): Settings {
         ? (parsed.windowControlsPosition as WindowControlsPosition)
         : DEFAULTS.windowControlsPosition,
       keybindings: normalizeKeybindings(parsed.keybindings),
+      fileViewer:
+        typeof parsed.fileViewer === "string" && parsed.fileViewer.trim()
+          ? parsed.fileViewer.trim()
+          : DEFAULTS.fileViewer,
+      fileEditor:
+        typeof parsed.fileEditor === "string" && parsed.fileEditor.trim()
+          ? parsed.fileEditor.trim()
+          : DEFAULTS.fileEditor,
+      fileClickAction: FILE_CLICK_ACTIONS.includes(parsed.fileClickAction as FileClickAction)
+        ? (parsed.fileClickAction as FileClickAction)
+        : DEFAULTS.fileClickAction,
       background: {
         image:
           parsed.background && typeof parsed.background.image === "string"

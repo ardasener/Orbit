@@ -7,54 +7,12 @@
   border-bottom: 1px solid var(--ol-border);
 }
 
-/* Control-only strip: content is rendered by the split layout. One row that
-   scrolls horizontally (no visible scrollbar) when tabs overflow. */
-.tab-strip {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none; /* Firefox */
-  -webkit-overflow-scrolling: touch;
-}
-
-.tab-strip::-webkit-scrollbar {
-  display: none; /* WebKit/WKWebView */
-}
-
-/* Tab tags are pointer-drag sources; don't select text while dragging. */
-.terminal-tab-tag {
-  user-select: none;
-  -webkit-user-select: none;
-  cursor: grab;
-  margin-inline-end: 0;
-  border: 1px solid var(--ol-border);
-  background: var(--ol-surface);
-  color: var(--ol-text-muted);
-  border-radius: 4px;
-  font-size: calc(12px * var(--ol-scale));
-  line-height: 20px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.terminal-tab-tag .ant-tag-close-icon {
-  color: var(--ol-text-muted);
-}
-
-.terminal-tab-tag:hover {
-  border-color: var(--ol-primary);
-}
-
 .tabbar-actions {
   display: flex;
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* Left action group before the tab strip: workspace toggle, settings,
@@ -64,6 +22,99 @@
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+}
+
+/* Each pane owns its tab bar; the global bar contains only app/window actions. */
+.pane-tabs {
+  position: relative;
+  z-index: 3;
+  pointer-events: auto;
+  padding: 0 6px;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.pane-tabs-inactive {
+  opacity: 0.68;
+}
+
+.pane-tabs-drop-target {
+  box-shadow: inset 0 -2px 0 var(--ol-primary);
+}
+
+.pane-tabs .ant-tabs {
+  margin: 0;
+}
+
+.pane-tabs .ant-tabs-nav {
+  margin: 0;
+  height: 24px;
+  min-height: 24px;
+}
+
+.pane-tabs .ant-tabs-tab {
+  padding: 1px 6px;
+  font-size: 11px;
+  line-height: 20px;
+}
+
+.pane-tabs .ant-tabs-nav-list {
+  align-items: center;
+}
+
+.pane-tabs .ant-tabs-nav-add {
+  align-items: center;
+  align-self: center;
+  display: inline-flex;
+  height: 20px;
+  min-height: 20px;
+  padding: 0 5px;
+}
+
+.pane-tabs .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab,
+.pane-tabs .ant-tabs-card > div > .ant-tabs-nav .ant-tabs-tab {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.pane-tabs .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab-active,
+.pane-tabs .ant-tabs-card > div > .ant-tabs-nav .ant-tabs-tab-active {
+  background: transparent;
+}
+
+.pane-tabs .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab::before,
+.pane-tabs .ant-tabs-card > div > .ant-tabs-nav .ant-tabs-tab::before {
+  display: none;
+}
+
+.pane-tabs .ant-tabs-card > .ant-tabs-nav .ant-tabs-nav-add,
+.pane-tabs .ant-tabs-card > div > .ant-tabs-nav .ant-tabs-nav-add {
+  border: 0;
+  background: transparent;
+}
+
+.pane-tabs .ant-tabs-nav-wrap {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.pane-tabs .ant-tabs-nav-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+.pane-tabs .ant-tabs-content-holder {
+  display: none;
+}
+
+.pane-tabs .ant-tabs-tab {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
+.pane-tabs [data-pane-tab] {
+  cursor: grab;
 }
 
 /* ── Runnable launcher popover ─────────────────────────────── */

@@ -19,7 +19,10 @@ struct TestFace {
 impl TestFace {
     #[cfg(test)]
     fn new(family: &str, monospaced: bool) -> Self {
-        Self { family: family.into(), monospaced }
+        Self {
+            family: family.into(),
+            monospaced,
+        }
     }
 }
 
@@ -70,10 +73,19 @@ mod tests {
             TestFace::new("Inter", false),
         ];
 
-        assert_eq!(families_from_faces(faces), vec![
-            FontFamily { name: "Fira Code".into(), monospaced: true },
-            FontFamily { name: "Inter".into(), monospaced: false },
-        ]);
+        assert_eq!(
+            families_from_faces(faces),
+            vec![
+                FontFamily {
+                    name: "Fira Code".into(),
+                    monospaced: true
+                },
+                FontFamily {
+                    name: "Inter".into(),
+                    monospaced: false
+                },
+            ]
+        );
     }
 
     #[test]

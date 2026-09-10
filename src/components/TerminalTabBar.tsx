@@ -1,6 +1,6 @@
-import type { CSSProperties, KeyboardEvent, MouseEvent, WheelEvent } from "react";
-import { useEffect, useRef, useState } from "react";
-import { Button, Input, Popover, Tag, Tooltip } from "antd";
+import type { CSSProperties, KeyboardEvent } from "react";
+import { useEffect, useState } from "react";
+import { Button, Input, Popover, Tooltip } from "antd";
 import {
   ClearOutlined,
   ColumnWidthOutlined,
@@ -25,37 +25,21 @@ interface TerminalTabBarProps {
   onToggleWorkspaces: () => void;
 }
 
-/**
- * Tab strip (control-only — content is rendered by the split layout) plus the
- * left action group (workspace toggle, settings, cleanup) and the new-tab,
- * launcher and split-toggle actions. The container is a macOS drag region:
- * AntD tab items (role="tab") and buttons are clickable and block dragging;
- * empty bar space drags the window.
- */
+/** Global window chrome. Terminal tabs are rendered inside their owning panes. */
 function TerminalTabBar({
   onOpenSettings,
   onOpenCleanup,
   workspacesOpen,
   onToggleWorkspaces,
 }: TerminalTabBarProps) {
-  const { state, slotOf, newTab, closeTab, selectTab, toggleVertical, toggleBottom, beginDrag, launchRunnable } =
-    useTerminalLayout();
+  const { state, newTab, toggleVertical, toggleBottom, launchRunnable } = useTerminalLayout();
   const { settings, palette } = useSettings();
-
-  // Software window controls exist only on undecorated windows (non-macOS);
-  // macOS keeps its native traffic lights and the 80px left padding.
   const showWindowControls = !isMacOS();
   const controlsSide = settings.windowControlsPosition;
-
-  const focusedTabId =
-    state.focusedSlot < state.slots.length ? state.slots[state.focusedSlot] : null;
-
-  // Runnable launcher popover state.
   const [launcherOpen, setLauncherOpen] = useState(false);
   const [launcherQuery, setLauncherQuery] = useState("");
   const [launcherIndex, setLauncherIndex] = useState(0);
 
-  // Expose opening the launcher to the keyboard hook.
   useEffect(() => {
     return registerShortcutAction("openLauncher", () => setLauncherOpen(true));
   }, []);
@@ -67,68 +51,27 @@ function TerminalTabBar({
     launchRunnable(commands);
   };
 
-  const filteredRunnables = settings.runnables.filter((r) =>
-    r.name.toLowerCase().includes(launcherQuery.trim().toLowerCase()),
+  const filteredRunnables = settings.runnables.filter((runnable) =>
+    runnable.name.toLowerCase().includes(launcherQuery.trim().toLowerCase()),
   );
 
-  // Keep the highlighted index in range when the query changes.
   useEffect(() => {
-    setLauncherIndex((i) => Math.min(i, Math.max(0, filteredRunnables.length - 1)));
+    setLauncherIndex((index) => Math.min(index, Math.max(0, filteredRunnables.length - 1)));
   }, [filteredRunnables.length]);
 
-  const handleLauncherKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleLauncherKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (filteredRunnables.length === 0) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setLauncherIndex((i) => (i + 1) % filteredRunnables.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setLauncherIndex((i) => (i - 1 + filteredRunnables.length) % filteredRunnables.length);
-    } else if (e.key === "Enter") {
-      e.preventDefault();
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setLauncherIndex((index) => (index + 1) % filteredRunnables.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setLauncherIndex((index) => (index - 1 + filteredRunnables.length) % filteredRunnables.length);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
       launch(filteredRunnables[launcherIndex].commands);
     }
   };
-
-  // Press origin for pointer-drag initiation (mousedown → threshold → beginDrag).
-  const pressRef = useRef<{ tabId: string; x: number; y: number } | null>(null);
-
-  const handleLabelMouseDown = (tabId: string) => (e: MouseEvent) => {
-    if (e.button !== 0) return;
-    pressRef.current = { tabId, x: e.clientX, y: e.clientY };
-  };
-
-  const handleLabelMouseMove = (tabId: string) => (e: MouseEvent) => {
-    const press = pressRef.current;
-    if (!press || press.tabId !== tabId) return;
-    const dx = e.clientX - press.x;
-    const dy = e.clientY - press.y;
-    if (dx * dx + dy * dy > 16) {
-      // ~4px movement threshold: this is a drag, not a click.
-      pressRef.current = null;
-      beginDrag(tabId, e.clientX, e.clientY);
-    }
-  };
-
-  const clearPress = () => {
-    pressRef.current = null;
-  };
-
-  // Strip ref for wheel scrolling + auto-scroll-to-active.
-  const stripRef = useRef<HTMLDivElement | null>(null);
-  const activeTagRef = useRef<HTMLSpanElement | null>(null);
-
-  // Wheel scrolls the strip horizontally only when content overflows.
-  const handleStripWheel = (e: WheelEvent) => {
-    const strip = stripRef.current;
-    if (!strip || strip.scrollWidth <= strip.clientWidth) return;
-    strip.scrollLeft += e.deltaY + e.deltaX;
-  };
-
-  // Bring the focused tag into view when the focused tab changes.
-  useEffect(() => {
-    activeTagRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [focusedTabId]);
 
   return (
     <div
@@ -136,9 +79,7 @@ function TerminalTabBar({
       data-tauri-drag-region="deep"
       style={isMacOS() ? ({ paddingLeft: 80 } as CSSProperties) : undefined}
     >
-      {showWindowControls && controlsSide === "left" && (
-        <WindowControls side="left" />
-      )}
+      {showWindowControls && controlsSide === "left" && <WindowControls side="left" />}
       <div className="tabbar-actions-left" data-tauri-drag-region="deep">
         <Tooltip title={workspacesOpen ? "Hide workspaces" : "Show workspaces"}>
           <Button
@@ -150,73 +91,15 @@ function TerminalTabBar({
           />
         </Tooltip>
         <Tooltip title="Settings">
-          <Button
-            type="text"
-            size="small"
-            icon={<SettingOutlined />}
-            onClick={onOpenSettings}
-            aria-label="Settings"
-          />
+          <Button type="text" size="small" icon={<SettingOutlined />} onClick={onOpenSettings} aria-label="Settings" />
         </Tooltip>
         <Tooltip title="Clean up workspaces">
-          <Button
-            type="text"
-            size="small"
-            icon={<ClearOutlined />}
-            onClick={onOpenCleanup}
-            aria-label="Clean up workspaces"
-          />
+          <Button type="text" size="small" icon={<ClearOutlined />} onClick={onOpenCleanup} aria-label="Clean up workspaces" />
         </Tooltip>
       </div>
-      <div
-        ref={stripRef}
-        className="tab-strip"
-        onWheel={handleStripWheel}
-        data-tauri-drag-region="deep"
-      >
-        {state.tabs.map((tab) => {
-          const slot = slotOf(tab.id);
-          const focused = tab.id === focusedTabId;
-          const accent = slot !== null ? palette.accents[slot] : undefined;
-          const tagStyle: CSSProperties = {
-            color: accent ?? "var(--ol-text-muted)",
-            fontWeight: focused ? 600 : 400,
-          };
-          if (focused) {
-            tagStyle.borderColor = accent;
-            tagStyle.background = accent ? `${accent}1a` : undefined;
-          }
-          return (
-            <Tag
-              key={tab.id}
-              ref={focused ? activeTagRef : undefined}
-              closable
-              className="terminal-tab-tag"
-              style={tagStyle}
-              onClick={() => selectTab(tab.id)}
-              onClose={(e) => {
-                e.preventDefault();
-                closeTab(tab.id);
-              }}
-              onMouseDown={handleLabelMouseDown(tab.id)}
-              onMouseMove={handleLabelMouseMove(tab.id)}
-              onMouseUp={clearPress}
-              onMouseLeave={clearPress}
-            >
-              {tab.title}
-            </Tag>
-          );
-        })}
-      </div>
-      <div className="tabbar-actions">
-        <Tooltip title="New terminal">
-          <Button
-            type="text"
-            size="small"
-            icon={<PlusOutlined />}
-            onClick={newTab}
-            aria-label="New terminal"
-          />
+      <div className="tabbar-actions" data-tauri-drag-region="deep">
+        <Tooltip title="New terminal in focused pane">
+          <Button type="text" size="small" icon={<PlusOutlined />} onClick={() => newTab()} aria-label="New terminal" />
         </Tooltip>
         <Popover
           trigger="click"
@@ -229,45 +112,38 @@ function TerminalTabBar({
             }
           }}
           placement="bottomRight"
-          content={
+          content={(
             <div className="launcher-popover">
               <Input
                 size="small"
                 autoFocus
                 placeholder="Search runnables"
                 value={launcherQuery}
-                onChange={(e) => setLauncherQuery(e.target.value)}
+                onChange={(event) => setLauncherQuery(event.target.value)}
                 onKeyDown={handleLauncherKeyDown}
                 allowClear
               />
               <div className="launcher-list">
                 {filteredRunnables.length === 0 ? (
                   <div className="launcher-empty">No runnables match</div>
-                ) : (
-                  filteredRunnables.map((r, i) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      className={`launcher-row${i === launcherIndex ? " launcher-row-active" : ""}`}
-                      onClick={() => launch(r.commands)}
-                      onMouseEnter={() => setLauncherIndex(i)}
-                    >
-                      <span className="launcher-name">{r.name}</span>
-                      <span className="launcher-commands">{r.commands.join("  ")}</span>
-                    </button>
-                  ))
-                )}
+                ) : filteredRunnables.map((runnable, index) => (
+                  <button
+                    key={runnable.id}
+                    type="button"
+                    className={`launcher-row${index === launcherIndex ? " launcher-row-active" : ""}`}
+                    onClick={() => launch(runnable.commands)}
+                    onMouseEnter={() => setLauncherIndex(index)}
+                  >
+                    <span className="launcher-name">{runnable.name}</span>
+                    <span className="launcher-commands">{runnable.commands.join("  ")}</span>
+                  </button>
+                ))}
               </div>
             </div>
-          }
+          )}
         >
           <Tooltip title="Run an app">
-            <Button
-              type="text"
-              size="small"
-              icon={<RocketOutlined />}
-              aria-label="Run an app"
-            />
+            <Button type="text" size="small" icon={<RocketOutlined />} aria-label="Run an app" />
           </Tooltip>
         </Popover>
         <Tooltip title="Toggle vertical split">
@@ -291,9 +167,7 @@ function TerminalTabBar({
           />
         </Tooltip>
       </div>
-      {showWindowControls && controlsSide === "right" && (
-        <WindowControls side="right" />
-      )}
+      {showWindowControls && controlsSide === "right" && <WindowControls side="right" />}
     </div>
   );
 }

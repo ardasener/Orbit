@@ -97,11 +97,7 @@ fn migrate_legacy(config_dir: &Path, file: &Path) -> Vec<ProjectEntry> {
 
 /// Migration core, parameterized over the legacy file so tests can point it at
 /// a temp dir instead of the real `{config_dir}/overlook`.
-fn migrate_from(
-    config_dir: &Path,
-    file: &Path,
-    legacy: Option<&Path>,
-) -> Vec<ProjectEntry> {
+fn migrate_from(config_dir: &Path, file: &Path, legacy: Option<&Path>) -> Vec<ProjectEntry> {
     if file.exists() {
         return Vec::new();
     }
@@ -251,9 +247,7 @@ mod tests {
 
         // New file takes precedence over legacy from now on.
         fs::write(&new_file, r#"["/tmp/beta"]"#).unwrap();
-        assert!(
-            migrate_from(&new_dir, &new_file, Some(&legacy)).is_empty()
-        );
+        assert!(migrate_from(&new_dir, &new_file, Some(&legacy)).is_empty());
         assert_eq!(
             load_projects(&new_dir)
                 .iter()
@@ -278,10 +272,9 @@ mod tests {
     /// Structured entries round-trip through serialization.
     #[test]
     fn structured_entries_round_trip() {
-        let entries: Vec<ProjectEntry> = serde_json::from_str(
-            r#"[{"path":"/a","favorite":true,"displayName":"Alpha"}]"#,
-        )
-        .unwrap();
+        let entries: Vec<ProjectEntry> =
+            serde_json::from_str(r#"[{"path":"/a","favorite":true,"displayName":"Alpha"}]"#)
+                .unwrap();
         assert!(entries[0].favorite());
         assert_eq!(entries[0].display_name(), Some("Alpha"));
 
@@ -295,8 +288,7 @@ mod tests {
     /// Missing metadata fields default to false/None.
     #[test]
     fn structured_entry_defaults() {
-        let entries: Vec<ProjectEntry> =
-            serde_json::from_str(r#"[{"path":"/a"}]"#).unwrap();
+        let entries: Vec<ProjectEntry> = serde_json::from_str(r#"[{"path":"/a"}]"#).unwrap();
         assert!(!entries[0].favorite());
         assert_eq!(entries[0].display_name(), None);
     }
@@ -305,10 +297,8 @@ mod tests {
     /// the favorite flag.
     #[test]
     fn metadata_mutations_are_lossless() {
-        let e: ProjectEntry = serde_json::from_str(
-            r#"{"path":"/a","favorite":true,"displayName":"Alpha"}"#,
-        )
-        .unwrap();
+        let e: ProjectEntry =
+            serde_json::from_str(r#"{"path":"/a","favorite":true,"displayName":"Alpha"}"#).unwrap();
         assert!(!e.with_favorite(false).favorite());
         assert_eq!(e.with_favorite(false).display_name(), Some("Alpha"));
         assert!(e.with_display_name(None).favorite());
