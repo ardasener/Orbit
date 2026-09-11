@@ -8,6 +8,7 @@ import {
   PlusOutlined,
   StarFilled,
   StarOutlined,
+  WarningOutlined,
 } from "@ant-design/icons";
 import {
   Button,
@@ -33,6 +34,7 @@ import { useTerminalLayout } from "../layout/TerminalLayoutContext";
 import { registerShortcutAction } from "../shortcuts/actionRegistry";
 import "./WorkspaceSidebar.css";
 import FileBrowser from "./FileBrowser";
+import { canForkProject } from "../workspace/projectOrdering";
 
 interface WorkspaceSidebarProps {
   /** Open the panel when it's collapsed (used by the focus shortcut). */
@@ -194,7 +196,7 @@ function WorkspaceSidebar({ onReveal }: WorkspaceSidebarProps) {
 
   const projectMenu = (project: ProjectInfo): MenuProps => ({
     items: [
-      ...(project.isGit
+      ...(canForkProject(project)
         ? [
             {
               key: "fork",
@@ -309,12 +311,15 @@ function WorkspaceSidebar({ onReveal }: WorkspaceSidebarProps) {
     // Keys are prefixed: the default worktree's path equals the project path,
     // so raw paths would collide (the project node would swallow its children).
     key: `p:${project.path}`,
+    isLeaf: !project.reachable,
     title: (
       <Dropdown trigger={["contextMenu"]} menu={projectMenu(project)}>
-        <span className="project-title">
-          <span className="project-name" title={project.path}>
-            {truncateName(projectLabel(project))}
-          </span>
+        <Tooltip title={project.reachable ? undefined : "Project directory could not be reached"}>
+          <span className={`project-title${project.reachable ? "" : " project-unreachable"}`}>
+            <span className="project-name" title={project.path}>
+              {truncateName(projectLabel(project))}
+            </span>
+            {!project.reachable && <WarningOutlined aria-label="Project directory unavailable" />}
           <Button
             type="text"
             size="small"
@@ -336,13 +341,14 @@ function WorkspaceSidebar({ onReveal }: WorkspaceSidebarProps) {
                 : `Favorite ${projectLabel(project)}`
             }
           />
-        </span>
+          </span>
+        </Tooltip>
       </Dropdown>
     ),
-    children: project.worktrees.map((wt) => ({
+    children: project.reachable ? project.worktrees.map((wt) => ({
       key: `w:${wt.path}`,
       title: worktreeTitle(wt, project),
-    })),
+    })) : undefined,
   }));
 
   const onSelect: TreeProps["onSelect"] = (keys) => {

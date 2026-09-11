@@ -9,6 +9,7 @@ import {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { sortProjects } from "./projectOrdering";
 
 export interface WorktreeInfo {
   path: string;
@@ -24,6 +25,7 @@ export interface ProjectInfo {
   isGit: boolean;
   branch: string | null;
   worktrees: WorktreeInfo[];
+  reachable: boolean;
 }
 
 /** The name shown in the tree: the display name when set, else the basename. */
@@ -80,6 +82,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    const refreshOnFocus = () => void refresh();
+    window.addEventListener("focus", refreshOnFocus);
+    return () => window.removeEventListener("focus", refreshOnFocus);
   }, [refresh]);
 
   const addProject = useCallback(
@@ -224,11 +232,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         })
       : projects;
     // Favorites first, then alphabetical by display name (per requirement).
-    return [...base]
-      .sort((a, b) => {
-        if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
-        return projectLabel(a).localeCompare(projectLabel(b));
-      })
+    return sortProjects(base)
       .map((p) => ({ ...p, worktrees: [...p.worktrees] }));
   }, [projects, search]);
 

@@ -67,6 +67,20 @@
   font-weight: 500;
 }
 
+.project-unreachable {
+  color: var(--ol-text-muted);
+  opacity: 0.65;
+}
+
+.project-unreachable .project-name {
+  color: var(--ol-text-muted);
+}
+
+.project-unreachable .anticon-warning {
+  color: var(--ol-warning, #d9a441);
+  flex-shrink: 0;
+}
+
 .project-action {
   color: var(--ol-text-muted) !important;
   flex-shrink: 0;

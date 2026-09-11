@@ -37,15 +37,30 @@ pub struct ProjectInfo {
     /// Branch of the default worktree (git projects only).
     pub branch: Option<String>,
     pub worktrees: Vec<WorktreeInfo>,
+    pub reachable: bool,
 }
 
-/// Build a project's info. Returns None when the directory no longer exists
-/// (stale config entries are silently dropped from the list).
+/// Build a project's info, preserving persisted entries whose directories are
+/// temporarily unavailable as project-only records.
 fn project_info(entry: &projects::ProjectEntry) -> Option<ProjectInfo> {
     let path = entry.path().to_string();
     let dir = PathBuf::from(&path);
     if !dir.is_dir() {
-        return None;
+        let name = dir
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| path.clone());
+        return Some(ProjectInfo {
+            path,
+            name,
+            display_name: entry.display_name().map(str::to_string),
+            favorite: entry.favorite(),
+            is_git: false,
+            branch: None,
+            worktrees: Vec::new(),
+            reachable: false,
+        });
     }
     let name = dir.file_name()?.to_string_lossy().into_owned();
     let is_git = worktrees::is_git_repo(&dir);
@@ -84,6 +99,7 @@ fn project_info(entry: &projects::ProjectEntry) -> Option<ProjectInfo> {
         is_git,
         branch,
         worktrees,
+        reachable: true,
     })
 }
 
@@ -219,4 +235,48 @@ pub fn workspace_fork(
         branch: worktrees::current_branch(&checkout),
         is_default: false,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unavailable_project_is_retained_without_worktrees() {
+        let path = std::env::temp_dir().join(format!(
+            "overlook-unavailable-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let entry = projects::ProjectEntry::Meta {
+            path: path.to_string_lossy().into_owned(),
+            favorite: true,
+            display_name: Some("Offline project".to_string()),
+        };
+        let info = project_info(&entry).expect("unavailable entries remain visible");
+        assert!(!info.reachable);
+        assert!(info.worktrees.is_empty());
+        assert_eq!(info.display_name.as_deref(), Some("Offline project"));
+        assert!(info.favorite);
+    }
+
+    #[test]
+    fn project_becomes_reachable_again_when_directory_returns() {
+        let path = std::env::temp_dir().join(format!(
+            "overlook-recover-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let entry = projects::ProjectEntry::Path(path.to_string_lossy().into_owned());
+        assert!(!project_info(&entry).unwrap().reachable);
+        fs::create_dir_all(&path).unwrap();
+        assert!(project_info(&entry).unwrap().reachable);
+        fs::remove_dir_all(path).unwrap();
+    }
 }

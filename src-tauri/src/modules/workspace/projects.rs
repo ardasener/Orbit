@@ -144,7 +144,7 @@ pub fn add_project(config_dir: &Path, path: &str) -> Result<String, String> {
 
 /// Untrack a project. Its managed worktrees are left on disk.
 pub fn remove_project(config_dir: &Path, path: &str) -> Result<(), String> {
-    let canonical = canonicalize(path)?;
+    let canonical = canonical_or_raw(path);
     let mut projects = load_projects(config_dir);
     projects.retain(|p| !same_directory(p.path(), &canonical));
     save_projects(config_dir, &projects)
@@ -152,7 +152,7 @@ pub fn remove_project(config_dir: &Path, path: &str) -> Result<(), String> {
 
 /// Set a project's favorite flag, persisting the updated entry.
 pub fn set_favorite(config_dir: &Path, path: &str, favorite: bool) -> Result<(), String> {
-    let canonical = canonicalize(path)?;
+    let canonical = canonical_or_raw(path);
     let mut projects = load_projects(config_dir);
     for entry in &mut projects {
         if same_directory(entry.path(), &canonical) {
@@ -165,7 +165,7 @@ pub fn set_favorite(config_dir: &Path, path: &str, favorite: bool) -> Result<(),
 
 /// Set a project's display name (None/empty clears it), persisting the entry.
 pub fn rename(config_dir: &Path, path: &str, display_name: &str) -> Result<(), String> {
-    let canonical = canonicalize(path)?;
+    let canonical = canonical_or_raw(path);
     let display_name = display_name.trim();
     let display_name = if display_name.is_empty() {
         None
@@ -180,6 +180,12 @@ pub fn rename(config_dir: &Path, path: &str, display_name: &str) -> Result<(), S
         }
     }
     Err("project not found".to_string())
+}
+
+fn canonical_or_raw(path: &str) -> String {
+    std::fs::canonicalize(path)
+        .map(|canonical| canonical.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| path.to_string())
 }
 
 /// Whether a stored project path refers to the same directory as the input's
@@ -220,6 +226,29 @@ mod tests {
         let a = canonicalize("/tmp").unwrap_or_else(|_| "/tmp".to_string());
         let b = canonicalize("/").unwrap_or_else(|_| "/".to_string());
         assert!(!same_directory(&a, &b));
+    }
+
+    #[test]
+    fn missing_project_can_be_updated_and_removed() {
+        let base =
+            std::env::temp_dir().join(format!("overlook-missing-project-{}", std::process::id()));
+        let config = base.join("config");
+        let missing = base.join("offline");
+        fs::create_dir_all(&config).unwrap();
+        save_projects(
+            &config,
+            &[ProjectEntry::Path(missing.to_string_lossy().into_owned())],
+        )
+        .unwrap();
+
+        set_favorite(&config, missing.to_string_lossy().as_ref(), true).unwrap();
+        rename(&config, missing.to_string_lossy().as_ref(), "Offline").unwrap();
+        assert_eq!(load_projects(&config)[0].display_name(), Some("Offline"));
+        assert!(load_projects(&config)[0].favorite());
+
+        remove_project(&config, missing.to_string_lossy().as_ref()).unwrap();
+        assert!(load_projects(&config).is_empty());
+        fs::remove_dir_all(base).unwrap();
     }
 
     /// load_projects migrates a legacy file into the new dir exactly once,
