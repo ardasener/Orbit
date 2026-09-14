@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Terminal } from "@xterm/xterm";
 import { WebglAddon } from "@xterm/addon-webgl";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useSettings } from "../../settings/SettingsContext";
 import { useTerminalLayout, type PaneIndex } from "../../layout/TerminalLayoutContext";
 import { registerShortcutAction } from "../../shortcuts/actionRegistry";
@@ -8,6 +10,8 @@ import type { ActionId } from "../../shortcuts/keybindings";
 import { shouldAllowTerminalTransparency, xtermOptions } from "../../themes/xterm";
 import { isShiftEnter } from "./keys";
 import { useTerminal } from "./useTerminal";
+import { formatDroppedPaths } from "./dropPaths";
+import { isDropInsideRect } from "./dropTarget";
 import {
   ptyClose,
   ptyForegroundProcess,
@@ -104,6 +108,83 @@ function TerminalHost({ tabId, slot, visible }: TerminalHostProps) {
   useEffect(() => {
     terminalRef.current = terminal;
   }, [terminal]);
+
+  // Native file drops are delivered by Tauri because WKWebView does not
+  // reliably dispatch custom DataTransfer drops to webview elements.
+  useEffect(() => {
+    if (!terminal) return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    let scaleFactor = 1;
+    const appWindow = getCurrentWindow();
+
+    void appWindow
+      .scaleFactor()
+      .then((scale) => {
+        if (!disposed) scaleFactor = scale;
+      })
+      .catch(() => {
+        /* unit scale is the safe fallback */
+      });
+
+    void getCurrentWebview().onDragDropEvent((event) => {
+        if (event.payload.type !== "drop" || !visibleRef.current) return;
+        const dropPosition = event.payload.position;
+        const droppedPaths = event.payload.paths;
+        const paths = formatDroppedPaths(droppedPaths);
+        if (paths.length === 0) return;
+
+        const container = containerRef.current;
+        const currentTerminal = terminalRef.current;
+        if (!container || !currentTerminal) return;
+        const rect = container.getBoundingClientRect();
+        const rawInside = isDropInsideRect(dropPosition, rect, 1);
+        if (rawInside) {
+          currentTerminal.paste(paths);
+          return;
+        }
+
+        // Tauri documents this payload as desktop physical coordinates, but
+        // macOS currently delivers local CSS-like coordinates in practice.
+        // Prefer the observed local form and retain the documented transform
+        // as a fallback for runtimes that emit the declared coordinate space.
+        void appWindow
+          .innerPosition()
+          .then((origin) => {
+            if (disposed || !visibleRef.current) return;
+            const currentContainer = containerRef.current;
+            const currentTerminal = terminalRef.current;
+            if (!currentContainer || !currentTerminal) return;
+
+            const currentRect = currentContainer.getBoundingClientRect();
+            const transformedInside = isDropInsideRect(
+              dropPosition,
+              currentRect,
+              scaleFactor,
+              origin,
+            );
+            if (transformedInside) currentTerminal.paste(paths);
+          })
+          .catch(() => {
+            /* native position lookup unavailable; ignore this drop */
+          });
+      })
+      .then((cleanup) => {
+        if (disposed) {
+          cleanup();
+        } else {
+          unlisten = cleanup;
+        }
+      })
+      .catch(() => {
+        /* native drop events are unavailable in this host */
+      });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [containerRef, terminal]);
 
   // Wire keyboard input and resize events back to the PTY.
   useEffect(() => {
