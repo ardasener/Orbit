@@ -243,28 +243,20 @@ pub fn files_watch_stop(state: State<'_, FileWatcherState>) -> Result<(), String
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
-    fn temp_root() -> PathBuf {
-        let root = std::env::temp_dir().join(format!(
-            "orbit-files-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        fs::create_dir_all(&root).unwrap();
-        root
+    fn temp_root() -> TempDir {
+        tempfile::tempdir().unwrap()
     }
 
     #[test]
     fn lists_directories_first_and_includes_hidden_entries() {
         let root = temp_root();
-        fs::create_dir(root.join("src")).unwrap();
-        fs::write(root.join(".env"), "").unwrap();
-        fs::write(root.join("README"), "").unwrap();
-        fs::write(root.join("z.txt"), "").unwrap();
-        let entries = list_directory(&root.to_string_lossy(), "").unwrap();
+        fs::create_dir(root.path().join("src")).unwrap();
+        fs::write(root.path().join(".env"), "").unwrap();
+        fs::write(root.path().join("README"), "").unwrap();
+        fs::write(root.path().join("z.txt"), "").unwrap();
+        let entries = list_directory(&root.path().to_string_lossy(), "").unwrap();
         assert_eq!(
             entries
                 .iter()
@@ -272,31 +264,27 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["src", ".env", "README", "z.txt"]
         );
-        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
     fn rejects_paths_outside_the_root() {
         let root = temp_root();
-        assert!(resolve_path(&root, "../outside").is_err());
-        fs::remove_dir_all(root).unwrap();
+        assert!(resolve_path(root.path(), "../outside").is_err());
     }
 
     #[test]
     fn does_not_traverse_symlinked_directories() {
         let root = temp_root();
         let target = temp_root();
-        fs::write(target.join("secret"), "").unwrap();
+        fs::write(target.path().join("secret"), "").unwrap();
         #[cfg(unix)]
-        std::os::unix::fs::symlink(&target, root.join("linked")).unwrap();
+        std::os::unix::fs::symlink(target.path(), root.path().join("linked")).unwrap();
         #[cfg(unix)]
         {
-            let entries = list_directory(&root.to_string_lossy(), "").unwrap();
+            let entries = list_directory(&root.path().to_string_lossy(), "").unwrap();
             assert!(entries
                 .iter()
                 .any(|entry| entry.name == "linked" && entry.is_symlink && !entry.is_directory));
         }
-        fs::remove_dir_all(root).unwrap();
-        fs::remove_dir_all(target).unwrap();
     }
 }
