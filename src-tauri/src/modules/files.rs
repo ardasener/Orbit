@@ -4,11 +4,11 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use notify_debouncer_full::notify::RecursiveMode;
-use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, FileIdMap};
+use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, RecommendedCache};
 use serde::Serialize;
 use tauri::{Emitter, State};
 
-type FileWatcher = Debouncer<notify_debouncer_full::notify::RecommendedWatcher, FileIdMap>;
+type FileWatcher = Debouncer<notify_debouncer_full::notify::RecommendedWatcher, RecommendedCache>;
 
 #[derive(Default)]
 pub struct FileWatcherState {
