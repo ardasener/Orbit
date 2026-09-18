@@ -1,5 +1,5 @@
 //! Persistence of the tracked project list in the app's config directory
-//! (`~/Library/Application Support/com.overlook.app/projects.json` or the OS
+//! (`~/Library/Application Support/com.ardasener.orbit/projects.json` or the OS
 //! equivalent). The directory is identifier-based (Tauri's `app_config_dir`),
 //! so dev and installed builds keep separate state.
 //!
@@ -72,46 +72,16 @@ fn projects_file(config_dir: &Path) -> PathBuf {
     config_dir.join("projects.json")
 }
 
-/// Legacy pre-identifier location: `{config_dir}/overlook/projects.json`.
-fn legacy_projects_file() -> Option<PathBuf> {
-    dirs::config_dir().map(|d| d.join("overlook").join("projects.json"))
+/// Load the tracked projects. Missing or corrupt files degrade to an empty list.
+pub fn load_projects(config_dir: &Path) -> Vec<ProjectEntry> {
+    load_projects_file(&projects_file(config_dir))
 }
 
-/// Load the tracked projects. Missing or corrupt files degrade to an empty
-/// list. On first load, a legacy projects file from the pre-identifier
-/// location is copied into the new one.
-pub fn load_projects(config_dir: &Path) -> Vec<ProjectEntry> {
-    let file = projects_file(config_dir);
-    let Ok(content) = fs::read_to_string(&file) else {
-        return migrate_legacy(config_dir, &file);
+fn load_projects_file(file: &Path) -> Vec<ProjectEntry> {
+    let Ok(content) = fs::read_to_string(file) else {
+        return Vec::new();
     };
     serde_json::from_str::<Vec<ProjectEntry>>(&content).unwrap_or_default()
-}
-
-/// One-time migration: if the new identifier-based file is absent and a legacy
-/// `{config_dir}/overlook/projects.json` exists, copy its contents into the
-/// new location. The legacy file is never deleted. Returns the migrated list.
-fn migrate_legacy(config_dir: &Path, file: &Path) -> Vec<ProjectEntry> {
-    migrate_from(config_dir, file, legacy_projects_file().as_deref())
-}
-
-/// Migration core, parameterized over the legacy file so tests can point it at
-/// a temp dir instead of the real `{config_dir}/overlook`.
-fn migrate_from(config_dir: &Path, file: &Path, legacy: Option<&Path>) -> Vec<ProjectEntry> {
-    if file.exists() {
-        return Vec::new();
-    }
-    let Some(legacy) = legacy else {
-        return Vec::new();
-    };
-    let Ok(content) = fs::read_to_string(legacy) else {
-        return Vec::new();
-    };
-    let Ok(projects) = serde_json::from_str::<Vec<ProjectEntry>>(&content) else {
-        return Vec::new();
-    };
-    let _ = save_projects(config_dir, &projects);
-    projects
 }
 
 fn save_projects(config_dir: &Path, projects: &[ProjectEntry]) -> Result<(), String> {
@@ -231,7 +201,7 @@ mod tests {
     #[test]
     fn missing_project_can_be_updated_and_removed() {
         let base =
-            std::env::temp_dir().join(format!("overlook-missing-project-{}", std::process::id()));
+            std::env::temp_dir().join(format!("orbit-missing-project-{}", std::process::id()));
         let config = base.join("config");
         let missing = base.join("offline");
         fs::create_dir_all(&config).unwrap();
@@ -251,40 +221,13 @@ mod tests {
         fs::remove_dir_all(base).unwrap();
     }
 
-    /// load_projects migrates a legacy file into the new dir exactly once,
-    /// preserving the legacy file, and new data wins afterwards.
+    /// A missing Orbit projects file starts empty and does not create config.
     #[test]
-    fn legacy_file_migrates_once_and_new_wins() {
-        let base = std::env::temp_dir().join(format!("overlook-test-{}", std::process::id()));
-        let legacy_dir = base.join("overlook");
-        let new_dir = base.join("com.overlook.app");
-        fs::create_dir_all(&legacy_dir).unwrap();
-        let legacy = legacy_dir.join("projects.json");
-        fs::write(&legacy, r#"["/tmp/alpha"]"#).unwrap();
-
-        // First load migrates the legacy content into the new location.
-        let new_file = projects_file(&new_dir);
-        assert_eq!(
-            migrate_from(&new_dir, &new_file, Some(&legacy))
-                .iter()
-                .map(ProjectEntry::path)
-                .collect::<Vec<_>>(),
-            vec!["/tmp/alpha"]
-        );
-        assert!(new_file.exists());
-        assert!(legacy.exists(), "legacy file must be preserved");
-
-        // New file takes precedence over legacy from now on.
-        fs::write(&new_file, r#"["/tmp/beta"]"#).unwrap();
-        assert!(migrate_from(&new_dir, &new_file, Some(&legacy)).is_empty());
-        assert_eq!(
-            load_projects(&new_dir)
-                .iter()
-                .map(ProjectEntry::path)
-                .collect::<Vec<_>>(),
-            vec!["/tmp/beta"]
-        );
-
+    fn missing_projects_file_loads_empty_without_creating_config() {
+        let base = std::env::temp_dir().join(format!("orbit-test-{}", std::process::id()));
+        let file = base.join("projects.json");
+        assert!(load_projects_file(&file).is_empty());
+        assert!(!file.exists());
         fs::remove_dir_all(&base).ok();
     }
 
@@ -337,15 +280,11 @@ mod tests {
     /// set_favorite and rename persist through save/load.
     #[test]
     fn favorite_and_rename_persist() {
-        let base = std::env::temp_dir().join(format!("overlook-meta-test-{}", std::process::id()));
+        let base = std::env::temp_dir().join(format!("orbit-meta-test-{}", std::process::id()));
         let _ = fs::remove_dir_all(&base);
         fs::create_dir_all(&base).unwrap();
         let dir = base.join("proj");
         fs::create_dir_all(&dir).unwrap();
-
-        // Seed an empty projects file so the legacy migration (which reads the
-        // real `{config_dir}/overlook/projects.json`) never fires in tests.
-        fs::write(projects_file(&base), "[]").unwrap();
 
         add_project(&base, dir.to_str().unwrap()).unwrap();
         set_favorite(&base, dir.to_str().unwrap(), true).unwrap();

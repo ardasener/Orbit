@@ -6,13 +6,13 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Overlook is served from GitHub Pages at ardasener.github.io/overlook/.
+// Orbit is served from GitHub Pages at ardasener.github.io/orbit/.
 const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://ardasener.github.io/';
 
 // https://astro.build/config
 export default defineConfig({
   site: siteUrl,
-  base: '/overlook/',
+  base: '/orbit/',
   envPrefix: 'PUBLIC_',
   vite: {
     plugins: [tailwindcss()],

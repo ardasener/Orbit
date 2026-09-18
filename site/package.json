@@ -1,11 +1,11 @@
 {
-  "name": "overlook-site",
+  "name": "orbit-site",
   "type": "module",
   "version": "1.0.0",
   "packageManager": "bun@1.2.17",
-  "description": "The Overlook landing page — terminal-first workspace for projects and git worktrees.",
+  "description": "The Orbit landing page — terminal-first workspace for projects and git worktrees.",
   "keywords": [
-    "overlook",
+    "orbit",
     "terminal",
     "workspace",
     "git worktree",
@@ -14,12 +14,12 @@
   "author": "Template Maintainers",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ricocc/ricoui-astro-starter.git"
+    "url": "git+https://github.com/ardasener/Orbit.git"
   },
   "bugs": {
-    "url": "https://github.com/ricocc/ricoui-astro-starter/issues"
+    "url": "https://github.com/ardasener/Orbit/issues"
   },
-  "homepage": "https://github.com/ricocc/ricoui-astro-starter#readme",
+  "homepage": "https://github.com/ardasener/Orbit#readme",
   "license": "MIT",
   "engines": {
     "node": ">=22.12.0",

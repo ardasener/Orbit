@@ -12,7 +12,13 @@ type FileWatcher = Debouncer<notify_debouncer_full::notify::RecommendedWatcher, 
 
 #[derive(Default)]
 pub struct FileWatcherState {
-    watcher: Mutex<Option<FileWatcher>>,
+    state: Mutex<FileWatcherStateInner>,
+}
+
+#[derive(Default)]
+struct FileWatcherStateInner {
+    generation: u64,
+    watcher: Option<FileWatcher>,
 }
 
 #[derive(Clone, Serialize)]
@@ -88,12 +94,18 @@ fn relative_string(root: &Path, path: &Path) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn files_list_directory(
+pub async fn files_list_directory(
     worktree: String,
     relative_path: String,
 ) -> Result<Vec<FileEntry>, String> {
-    let root = canonical_root(&worktree)?;
-    let directory = resolve_path(&root, &relative_path)?;
+    tauri::async_runtime::spawn_blocking(move || list_directory(&worktree, &relative_path))
+        .await
+        .map_err(|e| format!("directory listing task failed: {e}"))?
+}
+
+fn list_directory(worktree: &str, relative_path: &str) -> Result<Vec<FileEntry>, String> {
+    let root = canonical_root(worktree)?;
+    let directory = resolve_path(&root, relative_path)?;
     if !directory.is_dir() {
         return Err("path is not a directory".to_string());
     }
@@ -138,12 +150,40 @@ pub fn files_resolve_path(worktree: String, relative_path: String) -> Result<Fil
 }
 
 #[tauri::command]
-pub fn files_watch_start(
+pub async fn files_watch_start(
     app: tauri::AppHandle,
     state: State<'_, FileWatcherState>,
     worktree: String,
 ) -> Result<(), String> {
-    let root = canonical_root(&worktree)?;
+    let generation = {
+        let mut current = state
+            .state
+            .lock()
+            .map_err(|_| "file watcher state is unavailable".to_string())?;
+        current.generation = current.generation.wrapping_add(1);
+        current.watcher = None;
+        current.generation
+    };
+    // Stop the previous watcher before doing the blocking setup. This keeps
+    // setup asynchronous without allowing two watchers to remain active.
+    let watcher = tauri::async_runtime::spawn_blocking(move || {
+        let root = canonical_root(&worktree)?;
+        create_watcher(app, root)
+    })
+    .await
+    .map_err(|e| format!("file watcher task failed: {e}"))??;
+
+    let mut current = state
+        .state
+        .lock()
+        .map_err(|_| "file watcher state is unavailable".to_string())?;
+    if current.generation == generation {
+        current.watcher = Some(watcher);
+    }
+    Ok(())
+}
+
+fn create_watcher(app: tauri::AppHandle, root: PathBuf) -> Result<FileWatcher, String> {
     let root_for_callback = root.clone();
     let worktree_for_callback = root.to_string_lossy().into_owned();
     let app_for_callback = app.clone();
@@ -186,21 +226,17 @@ pub fn files_watch_start(
         .watch(&root, RecursiveMode::Recursive)
         .map_err(|e| format!("failed to watch worktree: {e}"))?;
 
-    let mut current = state
-        .watcher
-        .lock()
-        .map_err(|_| "file watcher state is unavailable".to_string())?;
-    *current = Some(debouncer);
-    Ok(())
+    Ok(debouncer)
 }
 
 #[tauri::command]
 pub fn files_watch_stop(state: State<'_, FileWatcherState>) -> Result<(), String> {
     let mut current = state
-        .watcher
+        .state
         .lock()
         .map_err(|_| "file watcher state is unavailable".to_string())?;
-    *current = None;
+    current.generation = current.generation.wrapping_add(1);
+    current.watcher = None;
     Ok(())
 }
 
@@ -210,7 +246,7 @@ mod tests {
 
     fn temp_root() -> PathBuf {
         let root = std::env::temp_dir().join(format!(
-            "overlook-files-{}-{}",
+            "orbit-files-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -228,8 +264,7 @@ mod tests {
         fs::write(root.join(".env"), "").unwrap();
         fs::write(root.join("README"), "").unwrap();
         fs::write(root.join("z.txt"), "").unwrap();
-        let entries =
-            files_list_directory(root.to_string_lossy().into_owned(), String::new()).unwrap();
+        let entries = list_directory(&root.to_string_lossy(), "").unwrap();
         assert_eq!(
             entries
                 .iter()
@@ -256,8 +291,7 @@ mod tests {
         std::os::unix::fs::symlink(&target, root.join("linked")).unwrap();
         #[cfg(unix)]
         {
-            let entries =
-                files_list_directory(root.to_string_lossy().into_owned(), String::new()).unwrap();
+            let entries = list_directory(&root.to_string_lossy(), "").unwrap();
             assert!(entries
                 .iter()
                 .any(|entry| entry.name == "linked" && entry.is_symlink && !entry.is_directory));

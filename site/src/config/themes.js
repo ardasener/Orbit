@@ -1,5 +1,5 @@
 export const themeSettings = {
-	// Overlook uses minimal-mono as its single identity.
+	// Orbit uses minimal-mono as its single identity.
 	defaultThemeId: "minimal-mono",
 	// The site offers light/dark only — no multi-theme switcher.
 	showThemeSwitcher: false,

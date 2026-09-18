@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "design-led-astro-starter",
+      "name": "orbit-site",
       "dependencies": {
         "@astrojs/mdx": "^7.0.5",
         "@astrojs/rss": "^4.0.19",

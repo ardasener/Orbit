@@ -244,7 +244,7 @@ mod tests {
     #[test]
     fn unavailable_project_is_retained_without_worktrees() {
         let path = std::env::temp_dir().join(format!(
-            "overlook-unavailable-{}-{}",
+            "orbit-unavailable-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -266,7 +266,7 @@ mod tests {
     #[test]
     fn project_becomes_reachable_again_when_directory_returns() {
         let path = std::env::temp_dir().join(format!(
-            "overlook-recover-{}-{}",
+            "orbit-recover-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

@@ -17,7 +17,7 @@ The application SHALL provide a Files mode beside the existing Workspaces mode i
 - **THEN** the sidebar SHALL show an empty state explaining that a worktree must be selected
 
 ### Requirement: Lazy collapsed file tree
-The Files mode SHALL show the active worktree's immediate children without an artificial root row. Directories SHALL begin collapsed and load their children only when expanded.
+The Files mode SHALL show the active worktree's immediate children without an artificial root row. Directories SHALL begin collapsed and load their children only when expanded. Loaded directory data SHALL be retained in an in-memory cache keyed by worktree and reused while valid.
 
 #### Scenario: Initial file tree
 - **WHEN** Files mode opens for an active worktree
@@ -98,7 +98,7 @@ The application SHALL launch configured view and edit executables as dedicated r
 - **THEN** its dedicated runnable terminal tab SHALL close using the existing runnable close-on-exit behavior
 
 ### Requirement: Worktree filesystem watcher
-The application SHALL watch the active worktree recursively, including `.git`, and SHALL emit debounced batches of file changes to the Files mode.
+The application SHALL watch the active worktree recursively, including `.git`, and SHALL emit debounced batches of file changes to the Files mode. Watcher registration SHALL run away from the UI-sensitive command path, and inactive worktrees SHALL have no watcher or background refresh.
 
 #### Scenario: Watch active worktree
 - **WHEN** Files mode is active for a worktree
@@ -125,12 +125,28 @@ The application SHALL watch the active worktree recursively, including `.git`, a
 - **AND** manual refresh SHALL remain available
 
 ### Requirement: Manual file refresh
-The Files mode SHALL provide a manual refresh action for the active worktree tree.
+The Files mode SHALL provide a manual refresh action for the active worktree tree without discarding cached entries, expansion, or selection state. Existing content SHALL remain visible while refresh is in flight.
 
 #### Scenario: Refresh files manually
 - **WHEN** the user activates refresh
 - **THEN** loaded/expanded directories SHALL be re-enumerated
 - **AND** the current expansion state SHALL be preserved where possible
+
+### Requirement: Per-worktree file-tree state
+The Files mode SHALL retain each worktree's loaded directory entries, expansion state, and selection in memory when the user switches sidebar modes or changes the active worktree.
+
+#### Scenario: Restore cached tree
+- **WHEN** the user returns to Files mode or switches back to a previously visited worktree
+- **THEN** cached entries, expansion, and selection SHALL be shown immediately
+- **AND** the active worktree SHALL refresh without clearing cached content
+
+### Requirement: Non-blocking and coalesced loading
+Directory listing and watcher setup SHALL execute without blocking frontend interaction. Duplicate concurrent requests for a worktree-relative directory SHALL be coalesced, and responses for an inactive worktree or superseded request SHALL be discarded.
+
+#### Scenario: Duplicate or obsolete request
+- **WHEN** a directory is requested repeatedly before the first response completes, or a response completes after worktree switching
+- **THEN** only one request SHALL update the matching active cache
+- **AND** obsolete responses SHALL not overwrite visible tree state
 
 ### Requirement: Path validation and filesystem boundary
 All file listings and path operations SHALL be performed by Rust. Rust SHALL reject requested paths that resolve outside the active worktree. View/edit commands SHALL use a Rust-validated absolute path before entering the existing terminal command path.

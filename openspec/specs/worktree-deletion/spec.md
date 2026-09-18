@@ -1,6 +1,6 @@
 ## Purpose
 
-Makes worktree removal safe: only Overlook-managed paths may be deleted, and deletion never touches unmanaged directories.
+Makes worktree removal safe: only Orbit-managed paths may be deleted, and deletion never touches unmanaged directories.
 
 ## Requirements
 
@@ -38,4 +38,4 @@ The workspace SHALL let the user delete a managed (non-default) worktree while k
 
 #### Scenario: Removing a worktree validates its location
 - **WHEN** a worktree path is removed
-- **THEN** the command SHALL only act on paths under the app's cache directory with the project's `overlook-<hash>-` prefix
+- **THEN** the command SHALL only act on paths under Orbit's cache directory with the project's `orbit-<hash>-` prefix

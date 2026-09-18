@@ -32,14 +32,14 @@ pub fn sanitize_branch(branch: &str) -> String {
 /// Directory name for a managed worktree of a project on a branch.
 pub fn worktree_dir_name(project_path: &str, branch: &str) -> String {
     format!(
-        "overlook-{}-{}",
+        "orbit-{}-{}",
         path_hash(project_path),
         sanitize_branch(branch)
     )
 }
 
 /// The actual git checkout for a managed worktree: the cache holds
-/// `<cache>/overlook-<hash>-<branch>/<project_name>`, so the checkout root
+/// `<cache>/orbit-<hash>-<branch>/<project_name>`, so the checkout root
 /// retains the project's folder name (tooling that keys on the folder name
 /// keeps working inside worktrees).
 pub fn worktree_checkout_path(
@@ -55,12 +55,12 @@ pub fn worktree_checkout_path(
 
 /// Name prefix that identifies a project's managed worktrees in the cache.
 pub fn worktree_prefix(project_path: &str) -> String {
-    format!("overlook-{}-", path_hash(project_path))
+    format!("orbit-{}-", path_hash(project_path))
 }
 
-/// `{cache_dir}/overlook` — where managed worktrees live.
+/// `{cache_dir}/orbit` — where managed worktrees live.
 pub fn cache_dir() -> Option<PathBuf> {
-    dirs::cache_dir().map(|d| d.join("overlook"))
+    dirs::cache_dir().map(|d| d.join("orbit"))
 }
 
 // ── System git ─────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ pub fn remove_worktree(project: &Path, dir: &Path, force: bool) -> Result<(), St
         return Err("no cache directory available".to_string());
     };
     let dir_str = dir.to_str().ok_or("worktree path is not valid UTF-8")?;
-    // The checkout is `<cache>/overlook-<hash>-<branch>/<project_name>`; the
+    // The checkout is `<cache>/orbit-<hash>-<branch>/<project_name>`; the
     // dir's PARENT must be inside the cache and carry the project's prefix.
     let parent = dir.parent().ok_or("worktree path has no parent")?;
     if !parent.starts_with(&cache) {
@@ -174,7 +174,7 @@ pub struct DiscoveredWorktree {
     pub branch: Option<String>,
 }
 
-/// Scan the cache for a project's managed worktrees (`overlook-<hash>-*`).
+/// Scan the cache for a project's managed worktrees (`orbit-<hash>-*`).
 /// Each checkout lives at `<outer>/<project_name>`; only existing checkouts
 /// are returned (vanished ones are pruned by omission, and `git worktree
 /// prune` clears their metadata). Adopts worktrees created by another app
@@ -230,7 +230,7 @@ mod tests {
     fn worktree_dir_name_is_prefixed() {
         let hash = path_hash("/tmp/demo");
         let name = worktree_dir_name("/tmp/demo", "feat/x");
-        assert_eq!(name, format!("overlook-{hash}-feat-x"));
+        assert_eq!(name, format!("orbit-{hash}-feat-x"));
         assert!(name.starts_with(&worktree_prefix("/tmp/demo")));
         assert!(!worktree_prefix("/tmp/demo").is_empty());
     }

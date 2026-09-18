@@ -53,7 +53,8 @@ The application SHALL let the user add a project directory via the `+` button an
 
 #### Scenario: Projects persist across restarts
 - **WHEN** the application restarts
-- **THEN** every persisted project SHALL be restored from the identifier-based config directory (e.g. `~/Library/Application Support/com.overlook.app/projects.json`), including temporarily unavailable projects, while migrating the legacy `{config_dir}/overlook/projects.json` file on first load when present
+- **THEN** every persisted project SHALL be restored from Orbit's identifier-based config directory (e.g. `~/Library/Application Support/com.ardasener.orbit/projects.json`), including temporarily unavailable projects
+- **AND** no Overlook project configuration SHALL be migrated or loaded
 
 #### Scenario: Projects survive a missing volume
 - **WHEN** a persisted project is on an unmounted or unavailable volume and the application restarts

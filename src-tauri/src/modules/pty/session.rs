@@ -312,7 +312,7 @@ pub fn spawn_session(
     // color that hides the wallpaper. Matches what other terminal apps set.
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
-    cmd.env("OVERLOOK_TERMINAL", "1");
+    cmd.env("ORBIT_TERMINAL", "1");
     // rxvt-family convention: foreground index;background. "default" signals
     // a transparent/default background so TUIs don't paint a solid one.
     cmd.env("COLORFGBG", "15;default");

@@ -1,6 +1,6 @@
-# Overlook
+# Orbit
 
-A lightweight, terminal-first desktop workspace for developers. Overlook helps you manage **project workspaces and git worktrees**, keeping per-worktree terminal sessions and state organized — without the AI chrome, built-in editors, or clutter of modern "agent IDEs".
+A lightweight, terminal-first desktop workspace for developers. Orbit helps you manage **project workspaces and git worktrees**, keeping per-worktree terminal sessions and state organized — without the AI chrome, built-in editors, or clutter of modern "agent IDEs".
 
 Design inspiration comes from [Terax](https://github.com/crynta/terax-ai) (terminal-first Tauri app) and [OpenChamber](https://github.com/openchamber/openchamber) (git worktree workflow polish). See [DESIGN.md](./DESIGN.md) for the full vision and architecture.
 
@@ -26,7 +26,7 @@ bun run tauri:dev    # development (isolated dev config; compiles Rust + launche
 bun tauri build      # production bundle
 ```
 
-Dev and installed builds use separate config (dev identifier `com.overlook.app.dev` via `src-tauri/tauri.dev.conf.json`), so daily development state — tracked projects, wallpaper — never collides with the installed app. `bun tauri dev` (raw) is equivalent but uses the prod identifier.
+Dev and installed builds use separate config (dev identifier `com.ardasener.orbit.dev` via `src-tauri/tauri.dev.conf.json`), so daily development state — tracked projects, wallpaper — never collides with the installed app. `bun tauri dev` (raw) is equivalent but uses the prod identifier.
 
 ### Known Linux graphics issue
 

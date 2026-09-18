@@ -1,8 +1,8 @@
-# Overlook — Design
+# Orbit — Design
 
 A lightweight, terminal-first desktop workspace for project management.
 
-Overlook helps developers organize their work into **project workspaces**, create **git worktrees** for parallel work, and keep per-worktree terminal sessions and state in order. It takes heavy design inspiration from [Terax](https://github.com/crynta/terax-ai) (a terminal-first Tauri 2 app) and [OpenChamber](https://github.com/openchamber/openchamber) (polished git/worktree workflows), but deliberately strips out the AI chrome, built-in editor, and other clutter those apps carry.
+Orbit helps developers organize their work into **project workspaces**, create **git worktrees** for parallel work, and keep per-worktree terminal sessions and state in order. It takes heavy design inspiration from [Terax](https://github.com/crynta/terax-ai) (a terminal-first Tauri 2 app) and [OpenChamber](https://github.com/openchamber/openchamber) (polished git/worktree workflows), but deliberately strips out the AI chrome, built-in editor, and other clutter those apps carry.
 
 > **Status**: Foundation phase. This document captures the vision and architecture. Feature work (worktrees, workspace state, multi-tab) builds on it in later changes.
 
@@ -12,13 +12,13 @@ Overlook helps developers organize their work into **project workspaces**, creat
 
 > A base of operations for your development work — terminal-first, project-centric, and quiet.
 
-- **Terminals, not AI.** You can happily run OpenCode, Codex, or any TUI inside Overlook's terminals. Overlook itself does not clutter the interface with AI tools.
-- **Projects, not files.** Overlook is organized around project workspaces and git worktrees. The app's job is creating them, keeping their state, and dropping you into a shell where the work happens.
+- **Terminals, not AI.** You can happily run OpenCode, Codex, or any TUI inside Orbit's terminals. Orbit itself does not clutter the interface with AI tools.
+- **Projects, not files.** Orbit is organized around project workspaces and git worktrees. The app's job is creating them, keeping their state, and dropping you into a shell where the work happens.
 - **Lean by default.** No built-in editor (open vim or micro), no file explorer you have to learn, no web preview. If a feature isn't about the terminal or project state, it doesn't belong.
 
 ### Positioning
 
-Terax is "terminal-first **AI-native** dev workspace." Overlook is "terminal-first **project-management** workspace." OpenChamber is a GUI for an AI agent; Overlook is a GUI for your git worktrees.
+Terax is "terminal-first **AI-native** dev workspace." Orbit is "terminal-first **project-management** workspace." OpenChamber is a GUI for an AI agent; Orbit is a GUI for your git worktrees.
 
 ### Non-features (explicitly out of scope)
 
@@ -162,6 +162,6 @@ src-tauri/                    # Rust backend
 
 ## 7. Open questions
 
-- **State storage**: JSON config under `~/.config/overlook/` vs SQLite — decide before the workspace-management change.
+- **State storage**: JSON config under `~/.config/orbit/` vs SQLite — decide before the workspace-management change.
 - **Theme system**: user-configurable themes (Terax-style) — not needed for foundation.
 - **Naming**: project name may be revisited before first release.

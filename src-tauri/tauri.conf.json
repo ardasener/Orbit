@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "overlook",
+  "productName": "Orbit",
   "version": "0.5.3",
-  "identifier": "com.overlook.app",
+  "identifier": "com.ardasener.orbit",
   "build": {
     "beforeDevCommand": "bun dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "overlook",
+        "title": "Orbit",
         "width": 800,
         "height": 600,
         "titleBarStyle": "Overlay",

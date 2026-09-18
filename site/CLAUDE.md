@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-Working context for editing the Overlook website (`site/`).
+Working context for editing the Orbit website (`site/`).
 
 ## Project
 
-The public landing page for Overlook, a terminal-first desktop workspace. Built with Astro,
+The public landing page for Orbit, a terminal-first desktop workspace. Built with Astro,
 Tailwind CSS v4, MDX, and a reusable component system (forked from the RicoUI Starter). It is a
 static marketing page — no backend.
 
@@ -34,9 +34,9 @@ bun run preview
 - Use existing components before creating new ones.
 - Use Lucide icons (`@lucide/astro`).
 - Keep light and dark styles together; dark mode is class-based (`dark_mode` in localStorage).
-- Download links point at `https://github.com/ardasener/overlook/releases/latest`.
+- Download links point at `https://github.com/ardasener/Orbit/releases/latest`.
 - The site deploys from the repo root's `.github/workflows/site.yml` to GitHub Pages at
-  `https://ardasener.github.io/overlook/`; the Astro `base` is `/overlook/`.
+  `https://ardasener.github.io/orbit/`; the Astro `base` is `/orbit/`.
 
 ## Do Not
 

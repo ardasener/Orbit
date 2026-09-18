@@ -1,6 +1,6 @@
-# Overlook website
+# Orbit website
 
-The public landing page for [Overlook](https://github.com/ardasener/overlook) — a lightweight,
+The public landing page for [Orbit](https://github.com/ardasener/Orbit) — a lightweight,
 terminal-first desktop workspace for projects and git worktrees.
 
 Built with [Astro](https://astro.build) (Tailwind CSS v4, MDX) on the
@@ -19,7 +19,7 @@ bun run preview  # preview the build
 ## Deploy
 
 Pushing to `main` builds the site and deploys it to GitHub Pages at
-`https://ardasener.github.io/overlook/` (see `.github/workflows/site.yml` in the repo root).
+`https://ardasener.github.io/orbit/` (see `.github/workflows/site.yml` in the repo root).
 
 ## Structure
 

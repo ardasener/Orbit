@@ -111,7 +111,7 @@ const DEFAULTS: Settings = {
   background: { image: null, blur: 20, opacity: 0.5, remapBackground: false, stripBackground: false },
 };
 
-const STORAGE_KEY = "overlook-settings";
+const STORAGE_KEY = "orbit-settings";
 
 function clampSize(value: number): number {
   return Math.min(TERM_SIZE_MAX, Math.max(TERM_SIZE_MIN, Math.round(value)));

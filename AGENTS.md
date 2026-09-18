@@ -4,7 +4,7 @@ Project-local workflow guidelines for agentic coding tools.
 
 ## Project
 
-Overlook — a lightweight, terminal-first desktop workspace for project management (workspaces + git worktrees). Tauri 2 + React 19 + Ant Design 6 + xterm.js + `portable-pty`.
+Orbit — a lightweight, terminal-first desktop workspace for project management (workspaces + git worktrees). Tauri 2 + React 19 + Ant Design 6 + xterm.js + `portable-pty`.
 
 ## Architecture boundary (load-bearing)
 
@@ -28,7 +28,7 @@ Do not add new commands that bypass this boundary. New commands must be register
 
 ```bash
 bun install
-bun run tauri:dev        # dev app (isolated dev config, identifier com.overlook.app.dev)
+bun run tauri:dev        # dev app (isolated dev config, identifier com.ardasener.orbit.dev)
 bun tauri build          # production bundle
 bun check-types          # TypeScript type check
 bun lint                 # ESLint
