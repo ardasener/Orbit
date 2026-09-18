@@ -1,6 +1,6 @@
 [package]
 name = "orbit"
-version = "0.5.3"
+version = "0.6.0"
 description = "Terminal-first desktop workspace for project management"
 authors = ["asener"]
 edition = "2021"
